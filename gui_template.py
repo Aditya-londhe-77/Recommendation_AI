@@ -46,7 +46,7 @@ class ChatGUI:
         self.send_btn.pack(side="right")
 
         self.typing_label = None
-        self.insert_welcome_message()
+        # Removed auto welcome message to avoid repeated greetings
 
     def run(self):
         self.window.mainloop()
@@ -100,7 +100,7 @@ class ChatGUI:
             self.typing_label = None
 
     def insert_welcome_message(self):
-        welcome = "👋 Welcome! Ask me about RO systems, softeners, UV purifiers, and other water treatment products."
+        welcome = "💧 I'm here to help you find the perfect water treatment solution! What kind of water challenges are you facing?"
         timestamp = datetime.now().strftime("%H:%M")
         self.insert_message("Bot", welcome, "#444444", anchor="w", timestamp=timestamp)
 

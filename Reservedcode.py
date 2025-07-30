@@ -31,26 +31,31 @@ vector_store = Chroma(
 retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 15})
 
 prompt = ChatPromptTemplate.from_template("""
-You are a friendly and knowledgeable sales assistant for a water treatment company.
-You help customers choose the right water purifier or system based on their needs.
-Be persuasive but honest. Explain things simply. Ask questions to understand needs.
+You are an experienced sales representative for a premium water treatment company. You talk like a knowledgeable human salesperson who genuinely cares about finding the right water solution for each customer.
 
-📝 Product List:
+📝 Available Products:
 {info}
 
-🗣️ Customer Question:
+🗣️ Customer Query:
 {question}
 
-💬 Conversation History:
+💬 Previous Conversation:
 {history}
 
-Instructions:
-- Only use information from the product list above.
-- Do not invent any product names or specs.
-- If the product is listed, give accurate and helpful details about it.
-- Do not hallucinate anything.
-- Do not suggest any products unless the customer explicitly asks.
-- If the user says "bye", "goodbye", or anything similar, reply politely and briefly.
+Your Sales Approach:
+- NEVER start with greetings like "Hello", "Hi", "Good morning" etc. - go straight to addressing their question
+- Be conversational and natural, like talking to a friend or neighbor
+- Focus on understanding their specific water needs and usage
+- Highlight key benefits and value propositions of recommended products
+- Use persuasive but honest sales language
+- Ask follow-up questions to better understand their requirements
+- Compare products when appropriate to help them decide
+- Mention pricing confidently and explain value for money
+- Only recommend products from the list above - never invent products
+- If they want to end the conversation, be brief and professional
+- Be enthusiastic about the products but not pushy
+
+Remember: You're here to help them solve their water problems, not just list products. Think like a human sales expert who builds trust through knowledge and genuine care.
 """)
 
 chain = prompt | model
@@ -61,7 +66,8 @@ def extract_keywords(user_input):
         "do","you","have","has","is","the","a","an","i","we","are","with",
         "any","of","in","for","to","on","and","me","can","could","please",
         "would","like","need","want","tell","know","if","it","this","that",
-        "there","be","at","ave","products","what"
+        "there","be","at","ave","products","what","looking","help","show",
+        "hello","hi","hey","good","morning","afternoon","evening"
     }
     words = re.findall(r"\b\w{2,}\b", user_input.lower())
     return [w for w in words if w not in stopwords]
@@ -139,33 +145,56 @@ def apply_filters(user_input):
 
 def handle_input(user_input):
     try:
+        # Check for goodbye/exit messages
+        goodbye_words = ["bye", "goodbye", "thanks", "thank you", "exit", "quit"]
+        if any(word in user_input.lower() for word in goodbye_words):
+            gui.display_reply("Thank you for your interest! Feel free to reach out anytime for your water treatment needs. Have a great day!")
+            return
+            
+        # Handle general greetings and convert to sales opportunity
+        greeting_words = ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"]
+        if any(greeting in user_input.lower() for greeting in greeting_words) and len(user_input.split()) <= 3:
+            gui.display_reply("What kind of water treatment solution are you looking for today? We have everything from home RO systems to large industrial plants.")
+            return
+            
         raw_kw = extract_keywords(user_input)
         keywords = normalize_keywords(raw_kw)
 
         docs = []
+        # First try exact keyword matching
         exact_df = df[df.apply(lambda r: matches_keywords(r, keywords), axis=1)]
-        for _, row in exact_df.iterrows():
+        for _, row in exact_df.head(8).iterrows():  # Increased to 8 for better selection
             docs.append(Document(page_content= (
-                f"Name: {row['Name']}\nPrice: ₹{row['Regular_price']}\nCategory: {row['Category']}\nDescription: {row['Short description']}"
+                f"Product Name: {row['Name']}\n"
+                f"Price: ₹{row['Regular_price']:,}\n"
+                f"Category: {row['Category']}\n"
+                f"Key Features: {row['Short description']}\n"
+                f"Variants Available: {row.get('Attribute 1 value(s)', 'Standard')}"
             )))
 
+        # If no exact matches, try filtered search
         if not docs:
             filtered_df = apply_filters(user_input)
-            for _, row in filtered_df.head(5).iterrows():
+            for _, row in filtered_df.head(6).iterrows():
                 docs.append(Document(page_content=(
-                    f"Name: {row['Name']}\nPrice: ₹{row['Regular_price']}\nCategory: {row['Category']}\nDescription: {row['Short description']}"
+                    f"Product Name: {row['Name']}\n"
+                    f"Price: ₹{row['Regular_price']:,}\n"
+                    f"Category: {row['Category']}\n"
+                    f"Key Features: {row['Short description']}\n"
+                    f"Variants Available: {row.get('Attribute 1 value(s)', 'Standard')}"
                 )))
 
+        # Last resort: vector similarity search
         if not docs:
             vector_docs = retriever.get_relevant_documents(user_input)
-            docs.extend(vector_docs)
+            docs.extend(vector_docs[:5])
 
         if not docs:
-            gui.display_reply("❌ Sorry, no matching products were found.")
+            gui.display_reply("I don't see any products matching your specific requirements right now. Could you tell me more about what type of water treatment you're looking for? For example, are you looking for home purifiers, industrial systems, or something specific for your business?")
             return
 
-        product_info = "\n\n".join(d.page_content for d in docs)
-        recent_hist = "\n".join(conversation_history[-4:])
+        product_info = "\n" + "="*50 + "\n".join(d.page_content for d in docs)
+        recent_hist = "\n".join(conversation_history[-6:])  # More context
 
         payload = {
             "history": recent_hist,
@@ -178,28 +207,22 @@ def handle_input(user_input):
 
         gui.display_reply(final)
 
-        #if single product matched shows image 
+        # Display image if single product matched
         if len(docs) == 1:
             product_name = docs[0].page_content.split("\n")[0].replace("Name: ", "").strip()
+            print(f"[DEBUG] Matched product name: {product_name}")
             product_row = df[df["Name"].str.lower() == product_name.lower()]
             if not product_row.empty:
                 image_url = product_row.iloc[0].get("Images", "")
-                if image_url.startswith("http"):
-                    gui.display_image(image_url)
-                    if len(docs) == 1:
-                     product_name = docs[0].page_content.split("\n")[0].replace("Name: ", "").strip()
-                     print(f"[DEBUG] Matched product name: {product_name}")
-                     product_row = df[df["Name"].str.lower() == product_name.lower()]
-                     if not product_row.empty:
-                         image_url = product_row.iloc[0].get("images", "")
-                         print(f"[DEBUG] Image URL: {image_url}")
-                         if image_url.startswith("http"):
-                            gui.display_image(image_url)
-                             
-                         else:
-                             print("[DEBUG] No valid image URL found.")
-                     else:
-                         print("[DEBUG] No matching product row found.")
+                print(f"[DEBUG] Image URL: {image_url}")
+                if image_url and str(image_url).startswith("http"):
+                    # Get first image URL if multiple URLs are comma-separated
+                    first_image_url = str(image_url).split(",")[0].strip()
+                    gui.display_image(first_image_url)
+                else:
+                    print("[DEBUG] No valid image URL found.")
+            else:
+                print("[DEBUG] No matching product row found.")
 
         
 

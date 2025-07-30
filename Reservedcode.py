@@ -31,31 +31,38 @@ vector_store = Chroma(
 retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 15})
 
 prompt = ChatPromptTemplate.from_template("""
-You are an experienced sales representative for a premium water treatment company. You talk like a knowledgeable human salesperson who genuinely cares about finding the right water solution for each customer.
+You are a water treatment sales expert. You ONLY help customers with water purification, RO systems, UV purifiers, water softeners, and related water treatment equipment.
 
-📝 Available Products:
+STRICT RULES:
+1. ONLY discuss water treatment topics - if asked about anything else, politely redirect to water solutions
+2. ONLY recommend products from the list below - NEVER mention products not in this list
+3. If no suitable products are found, say so honestly and ask for more specific requirements
+4. Talk like a human expert, not a robot - be conversational and natural
+5. NO greetings, get straight to helping with their water needs
+
+AVAILABLE PRODUCTS ONLY:
 {info}
 
-🗣️ Customer Query:
-{question}
+CUSTOMER QUESTION: {question}
+CONVERSATION HISTORY: {history}
 
-💬 Previous Conversation:
-{history}
+RESPONSE GUIDELINES:
+- If question is NOT about water treatment, say: "I specialize in water treatment solutions. What water challenges can I help you solve?"
+- Talk naturally like a human expert would - use phrases like "I'd recommend", "That sounds like", "Based on what you're telling me"
+- Be specific about product names, prices, and features from the list only
+- Ask practical questions: "What's your daily water usage?", "How many people?", "What's your budget range?"
+- Explain benefits simply: "This removes 99% of bacteria", "Saves ₹200 monthly on bottled water"
+- Use conversational transitions: "Actually,", "You know what,", "Here's the thing,"
+- Show genuine interest: "That's a common issue", "I see this a lot", "Good question"
+- Never hallucinate or invent product specifications
+- Reference only the exact product names from the catalog
 
-Your Sales Approach:
-- NEVER start with greetings like "Hello", "Hi", "Good morning" etc. - go straight to addressing their question
-- Be conversational and natural, like talking to a friend or neighbor
-- Focus on understanding their specific water needs and usage
-- Highlight key benefits and value propositions of recommended products
-- Use persuasive but honest sales language
-- Ask follow-up questions to better understand their requirements
-- Compare products when appropriate to help them decide
-- Mention pricing confidently and explain value for money
-- Only recommend products from the list above - never invent products
-- If they want to end the conversation, be brief and professional
-- Be enthusiastic about the products but not pushy
+HUMAN CONVERSATION EXAMPLES:
+"Based on what you're telling me, the [exact product name] would be perfect for your home."
+"That's a really common issue with bore water. I'd suggest looking at our [exact product name]."
+"For your budget, I'd recommend the [exact product name] - it's been really popular with families like yours."
 
-Remember: You're here to help them solve their water problems, not just list products. Think like a human sales expert who builds trust through knowledge and genuine care.
+Remember: You're a human water expert having a real conversation. Be natural, helpful, and stick to the catalog.
 """)
 
 chain = prompt | model
@@ -67,10 +74,21 @@ def extract_keywords(user_input):
         "any","of","in","for","to","on","and","me","can","could","please",
         "would","like","need","want","tell","know","if","it","this","that",
         "there","be","at","ave","products","what","looking","help","show",
-        "hello","hi","hey","good","morning","afternoon","evening"
+        "hello","hi","hey","good","morning","afternoon","evening","about",
+        "some","get","find","see","recommend","suggest","give","best"
     }
     words = re.findall(r"\b\w{2,}\b", user_input.lower())
-    return [w for w in words if w not in stopwords]
+    keywords = [w for w in words if w not in stopwords]
+    
+    # Add common water treatment terms if they appear in compound words or phrases
+    if "water" in user_input.lower():
+        keywords.append("water")
+    if "ro" in user_input.lower() or "reverse osmosis" in user_input.lower():
+        keywords.append("ro")
+    if "uv" in user_input.lower() or "ultraviolet" in user_input.lower():
+        keywords.append("uv")
+        
+    return keywords
 
 def normalize_keywords(keywords):
     synonyms = {
@@ -143,6 +161,24 @@ def apply_filters(user_input):
 
     return filtered
 
+def is_water_treatment_related(query):
+    """Check if the query is related to water treatment"""
+    water_keywords = {
+        'water', 'ro', 'reverse', 'osmosis', 'purifier', 'filter', 'filtration', 
+        'purification', 'treatment', 'softener', 'softening', 'uv', 'ultraviolet',
+        'plant', 'system', 'machine', 'unit', 'industrial', 'commercial', 'domestic',
+        'drinking', 'clean', 'pure', 'mineral', 'tds', 'alkaline', 'atm', 'vending',
+        'cooler', 'dispenser', 'membrane', 'cartridge', 'sediment', 'carbon',
+        'bacteria', 'virus', 'contamination', 'hardness', 'chlorine', 'iron',
+        'arsenic', 'fluoride', 'heavy', 'metals', 'bore', 'well', 'tap', 'supply'
+    }
+    
+    query_lower = query.lower()
+    query_words = set(re.findall(r'\b\w+\b', query_lower))
+    
+    # Check if any water-related keywords are present
+    return bool(water_keywords.intersection(query_words))
+
 def handle_input(user_input):
     try:
         # Check for goodbye/exit messages
@@ -157,44 +193,82 @@ def handle_input(user_input):
             gui.display_reply("What kind of water treatment solution are you looking for today? We have everything from home RO systems to large industrial plants.")
             return
             
+        # Check if query is water treatment related
+        if not is_water_treatment_related(user_input):
+            gui.display_reply("I specialize in water treatment solutions. What water challenges can I help you solve? We have RO systems, UV purifiers, water softeners, and industrial treatment plants.")
+            return
+            
         raw_kw = extract_keywords(user_input)
         keywords = normalize_keywords(raw_kw)
 
         docs = []
+        matched_products = set()  # Track products to avoid duplicates
+        
         # First try exact keyword matching
         exact_df = df[df.apply(lambda r: matches_keywords(r, keywords), axis=1)]
-        for _, row in exact_df.head(8).iterrows():  # Increased to 8 for better selection
-            docs.append(Document(page_content= (
-                f"Product Name: {row['Name']}\n"
-                f"Price: ₹{row['Regular_price']:,}\n"
-                f"Category: {row['Category']}\n"
-                f"Key Features: {row['Short description']}\n"
-                f"Variants Available: {row.get('Attribute 1 value(s)', 'Standard')}"
-            )))
+        for _, row in exact_df.head(6).iterrows():
+            product_name = row['Name']
+            if product_name not in matched_products:
+                matched_products.add(product_name)
+                docs.append(Document(page_content= (
+                    f"PRODUCT: {row['Name']}\n"
+                    f"PRICE: ₹{row['Regular_price']:,}\n"
+                    f"TYPE: {row['Category']}\n"
+                    f"DETAILS: {row['Short description']}\n"
+                    f"VARIANTS: {row.get('Attribute 1 value(s)', 'Standard')}\n"
+                    f"[VERIFIED PRODUCT FROM CATALOG]"
+                )))
 
         # If no exact matches, try filtered search
         if not docs:
             filtered_df = apply_filters(user_input)
-            for _, row in filtered_df.head(6).iterrows():
-                docs.append(Document(page_content=(
-                    f"Product Name: {row['Name']}\n"
-                    f"Price: ₹{row['Regular_price']:,}\n"
-                    f"Category: {row['Category']}\n"
-                    f"Key Features: {row['Short description']}\n"
-                    f"Variants Available: {row.get('Attribute 1 value(s)', 'Standard')}"
-                )))
+            for _, row in filtered_df.head(5).iterrows():
+                product_name = row['Name']
+                if product_name not in matched_products:
+                    matched_products.add(product_name)
+                    docs.append(Document(page_content=(
+                        f"PRODUCT: {row['Name']}\n"
+                        f"PRICE: ₹{row['Regular_price']:,}\n"
+                        f"TYPE: {row['Category']}\n"
+                        f"DETAILS: {row['Short description']}\n"
+                        f"VARIANTS: {row.get('Attribute 1 value(s)', 'Standard')}\n"
+                        f"[VERIFIED PRODUCT FROM CATALOG]"
+                    )))
 
-        # Last resort: vector similarity search
+        # Last resort: vector similarity search from CSV only
         if not docs:
             vector_docs = retriever.get_relevant_documents(user_input)
-            docs.extend(vector_docs[:5])
+            for doc in vector_docs[:4]:
+                # Extract product name and verify it exists in CSV
+                content_lines = doc.page_content.split('\n')
+                if content_lines:
+                    # Try to find the product in our CSV
+                    for _, row in df.iterrows():
+                        if row['Name'].lower() in doc.page_content.lower():
+                            product_name = row['Name']
+                            if product_name not in matched_products:
+                                matched_products.add(product_name)
+                                docs.append(Document(page_content=(
+                                    f"PRODUCT: {row['Name']}\n"
+                                    f"PRICE: ₹{row['Regular_price']:,}\n"
+                                    f"TYPE: {row['Category']}\n"
+                                    f"DETAILS: {row['Short description']}\n"
+                                    f"VARIANTS: {row.get('Attribute 1 value(s)', 'Standard')}\n"
+                                    f"[VERIFIED PRODUCT FROM CATALOG]"
+                                )))
+                                break
 
         if not docs:
-            gui.display_reply("I don't see any products matching your specific requirements right now. Could you tell me more about what type of water treatment you're looking for? For example, are you looking for home purifiers, industrial systems, or something specific for your business?")
+            gui.display_reply("I don't have any products in our current catalog that match what you're looking for. Could you be more specific about your water needs? Are you looking for home water purifiers, commercial systems, or industrial treatment plants? I'd be happy to suggest something from our available range.")
             return
 
-        product_info = "\n" + "="*50 + "\n".join(d.page_content for d in docs)
-        recent_hist = "\n".join(conversation_history[-6:])  # More context
+        # Create product list for AI with strict verification
+        product_info = "\n\n".join(d.page_content for d in docs)
+        product_names = list(matched_products)
+        product_info += f"\n\nAVAILABLE PRODUCT NAMES ONLY: {', '.join(product_names)}"
+        product_info += "\n\nIMPORTANT: Only mention products from the list above. Never suggest products not listed."
+        
+        recent_hist = "\n".join(conversation_history[-6:])
 
         payload = {
             "history": recent_hist,

@@ -1,0 +1,70 @@
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+from langchain_core.documents import Document
+import pandas as pd
+import os
+
+# -------------------------
+# 📦 Load CSV product data
+# -------------------------
+df = pd.read_csv("new_export.csv", encoding="ISO-8859-1").fillna("")
+
+# 💰 Ensure numeric price
+df["Regular_price"] = pd.to_numeric(df.get("Regular_price", 0), errors="coerce").fillna(0)
+
+# -------------------------
+# 🤖 Embeddings
+# -------------------------
+embedding_fn = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+# -------------------------
+# 📦 Vector DB Setup
+# -------------------------
+db_location = "./chroma_water_products"
+add_documents = not os.path.exists(db_location)
+
+vector_store = Chroma(
+    collection_name="water_product_recommendation",
+    persist_directory=db_location,
+    embedding_function=embedding_fn
+)
+
+if add_documents:
+    documents = []
+    ids = []
+
+    for i, row in df.iterrows():
+        name = row.get("Name", "")
+        category = row.get("Category", "")
+        price = int(float(row.get("Regular_price", 0)))
+        short_desc = row.get("Short description", "")
+        desc = row.get("Description", "")
+        img =row.get("Images", "")
+
+        page_content = f"""
+        Product Name: {name}
+        Category: {category}
+        Price: ₹{price}
+        Short Description: {short_desc}
+        Description: {desc}
+        Available for ₹{price} only.
+        Image of the Product:{img}
+        Suitable for RO, UV, Water Purification systems.
+        """.strip()
+
+        doc = Document(
+            page_content=page_content,
+            metadata={
+                "index": i,
+                "price": price # Add price as numeric metadata for filtering
+            }
+        )
+        documents.append(doc)
+        ids.append(str(i))
+
+    # Add and persist documents
+    vector_store.add_documents(documents=documents, ids=ids)
+    print(f"✅ {len(documents)} products added to vector store.")
+
+else:
+    print("✅ Vector store already exists. Loaded from disk.")

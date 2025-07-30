@@ -48,21 +48,23 @@ CONVERSATION HISTORY: {history}
 
 RESPONSE GUIDELINES:
 - If question is NOT about water treatment, say: "I specialize in water treatment solutions. What water challenges can I help you solve?"
-- IMMEDIATELY recommend specific products when asked - don't ask questions first
+- UNDERSTAND CUSTOMER NEEDS FIRST before recommending products
+- Ask about their specific situation: home/business, water issues, usage, budget
 - Check conversation history - NEVER repeat questions already asked
 - If you already know details from previous conversation, use that information
 - Talk naturally like a human expert would - use phrases like "I'd recommend", "That sounds like", "Based on what you're telling me"
 - Be specific about product names, prices, and features from the list only
-- Only ask NEW follow-up questions if genuinely needed for better recommendation
+- Only recommend products when you understand their specific needs
 - Explain benefits simply: "This removes 99% of bacteria", "Saves ₹200 monthly on bottled water"
 - Use conversational transitions: "Actually,", "You know what,", "Here's the thing,"
 - Show genuine interest: "That's a common issue", "I see this a lot", "Good question"
 - Never hallucinate or invent product specifications
 - Reference only the exact product names from the catalog
 
-IMMEDIATE RECOMMENDATION TRIGGERS:
-- "recommend", "suggest", "need", "want", "looking for", "which one", "best option"
-- When these words appear, give direct product recommendations with reasoning
+RECOMMENDATION APPROACH:
+- When user asks for recommendations, first understand: What type? For what use? What budget?
+- Only suggest products after gathering sufficient information about their needs
+- Don't overwhelm with options - suggest 2-3 most suitable products with clear reasons
 
 CONVERSATION MEMORY RULES:
 - If user mentioned budget before, remember it
@@ -200,16 +202,10 @@ def handle_input(user_input):
             gui.display_reply("Thank you for your interest! Feel free to reach out anytime for your water treatment needs. Have a great day!")
             return
             
-        # Handle general greetings and convert to sales opportunity with immediate options
+        # Handle general greetings naturally
         greeting_words = ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"]
         if any(greeting in user_input.lower() for greeting in greeting_words) and len(user_input.split()) <= 3:
-            # Get top 3 popular products for immediate showcase
-            top_products = df.head(3)
-            product_showcase = "Here are some of our most popular water treatment solutions:\n\n"
-            for _, row in top_products.iterrows():
-                product_showcase += f"• {row['Name']} - ₹{row['Regular_price']:,} ({row['Category']})\n"
-            product_showcase += "\nWhat type of water treatment are you interested in?"
-            gui.display_reply(product_showcase)
+            gui.display_reply("Hello! Great to hear from you. What kind of water treatment solution are you looking for? Are you facing any specific water quality issues at home or your business?")
             return
             
         # Check if query is water treatment related
@@ -217,7 +213,7 @@ def handle_input(user_input):
             gui.display_reply("I specialize in water treatment solutions. What water challenges can I help you solve? We have RO systems, UV purifiers, water softeners, and industrial treatment plants.")
             return
             
-        # Detect recommendation requests for immediate product suggestions
+        # Detect recommendation requests but focus on understanding needs first
         recommendation_triggers = ["recommend", "suggest", "need", "want", "looking for", "which one", "best option", "show me", "what do you have"]
         is_recommendation_request = any(trigger in user_input.lower() for trigger in recommendation_triggers)
             
@@ -261,22 +257,12 @@ def handle_input(user_input):
                         f"[VERIFIED PRODUCT FROM CATALOG]"
                     )))
 
-        # If still no matches and it's a recommendation request, get popular products
+        # If still no matches and it's a recommendation request, provide consultation approach
         if not docs and is_recommendation_request:
-            # Get some general products for recommendation
-            general_products = df.head(6)  # Get first 6 products as general recommendations
-            for _, row in general_products.iterrows():
-                product_name = row['Name']
-                if product_name not in matched_products:
-                    matched_products.add(product_name)
-                    docs.append(Document(page_content=(
-                        f"PRODUCT: {row['Name']}\n"
-                        f"PRICE: ₹{row['Regular_price']:,}\n"
-                        f"TYPE: {row['Category']}\n"
-                        f"DETAILS: {row['Short description']}\n"
-                        f"VARIANTS: {row.get('Attribute 1 value(s)', 'Standard')}\n"
-                        f"[VERIFIED PRODUCT FROM CATALOG - GENERAL RECOMMENDATION]"
-                    )))
+            # Don't push random products, instead understand needs better
+            if not recent_hist or len(conversation_history) < 2:
+                gui.display_reply("I'd be happy to recommend the right water treatment solution for you! To suggest the best option, could you tell me: Is this for your home or business? And are you facing any specific water quality issues like hard water, bad taste, or contamination?")
+                return
 
         # Last resort: vector similarity search from CSV only
         if not docs:
@@ -303,7 +289,7 @@ def handle_input(user_input):
 
         if not docs:
             if is_recommendation_request:
-                gui.display_reply("Let me show you some of our popular water treatment solutions. What specific type are you interested in - home purifiers, commercial systems, or industrial plants? I can recommend the best options for your needs.")
+                gui.display_reply("I'd love to help you find the perfect water treatment solution! To give you the best recommendation, could you share: What type of setup do you need - home, office, or industrial? What's your approximate budget range? And are there any specific water problems you're trying to solve?")
             else:
                 gui.display_reply("I don't have any products in our current catalog that match what you're looking for. Could you be more specific about your water needs? Are you looking for home water purifiers, commercial systems, or industrial treatment plants? I'd be happy to suggest something from our available range.")
             return
@@ -316,7 +302,7 @@ def handle_input(user_input):
         
         # Add special instruction for recommendation requests
         if is_recommendation_request:
-            product_info += "\n\nUSER IS ASKING FOR RECOMMENDATIONS: Provide specific product suggestions immediately with reasons why each product is suitable. Don't ask questions they already answered."
+            product_info += "\n\nUSER IS ASKING FOR RECOMMENDATIONS: First check if you have enough information about their needs (home/business, budget, water issues). If you do, recommend 2-3 suitable products. If not, ask for the missing details before recommending."
         
         recent_hist = "\n".join(conversation_history[-8:])  # More context to avoid repetition
         

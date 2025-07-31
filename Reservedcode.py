@@ -30,18 +30,338 @@ vector_store = Chroma(
 )
 retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 15})
 
+# Water Education Knowledge Base
+WATER_KNOWLEDGE_BASE = {
+    "alkaline_water": {
+        "title": "💧 Alkaline Water Benefits",
+        "content": """
+🌟 ALKALINE WATER BENEFITS:
+
+📊 pH Level: 8.5-9.5 (vs regular water 6.5-7.5)
+
+🔬 HEALTH BENEFITS:
+• Better Hydration: Smaller molecular clusters for easier absorption
+• Antioxidant Properties: Helps neutralize free radicals in the body
+• pH Balance: May help balance body's acidic levels
+• Improved Metabolism: Enhanced nutrient absorption
+• Detoxification: Assists in flushing out toxins
+• Bone Health: May help reduce bone loss
+
+⚡ HOW IT WORKS:
+Alkaline water is created through ionization process that increases pH and adds beneficial minerals like calcium, magnesium, and potassium.
+
+🥤 RECOMMENDED CONSUMPTION:
+• Start with 1-2 glasses daily
+• Gradually increase to 6-8 glasses
+• Best consumed 30 minutes before meals
+
+⚠️ CONSIDERATIONS:
+• Not recommended for people with kidney disease
+• Consult doctor if on medication
+• Natural alkaline sources preferred over artificial
+
+💡 SOURCES:
+• Natural spring water from alkaline rocks
+• Alkaline water ionizers (our RO+Alkaline systems)
+• Adding alkaline minerals to filtered water
+        """
+    },
+    "tds_information": {
+        "title": "🧪 TDS (Total Dissolved Solids) Guide",
+        "content": """
+📋 TDS EXPLANATION:
+
+🔍 WHAT IS TDS?
+Total Dissolved Solids - measure of dissolved minerals, salts, and metals in water (measured in ppm - parts per million)
+
+📊 TDS LEVELS GUIDE:
+• 0-50 ppm: Excellent (may lack essential minerals)
+• 50-150 ppm: Good (ideal for drinking)
+• 150-300 ppm: Fair (acceptable)
+• 300-500 ppm: Poor (needs treatment)
+• 500+ ppm: Unacceptable (requires purification)
+
+⚖️ BENEFITS OF OPTIMAL TDS:
+• 50-150 ppm provides essential minerals
+• Calcium for bone health
+• Magnesium for heart function
+• Potassium for muscle function
+• Trace minerals for overall health
+
+🚰 TDS ADJUSTMENT:
+• RO reduces TDS significantly (may go too low)
+• TDS Controller maintains essential minerals
+• Mineralizer adds back beneficial minerals
+• UV/UF preserves natural TDS levels
+
+💡 OUR SOLUTIONS:
+• RO + TDS Controller systems
+• Alkaline + Mineral cartridges
+• Smart TDS monitoring systems
+        """
+    },
+    "ro_vs_uv_uf": {
+        "title": "🔬 RO vs UV vs UF Technology Comparison",
+        "content": """
+⚡ WATER PURIFICATION TECHNOLOGIES:
+
+🌊 REVERSE OSMOSIS (RO):
+✅ Removes: Heavy metals, chemicals, salts, bacteria, viruses
+✅ TDS Reduction: 80-95%
+✅ Best For: High TDS water, chemical contamination
+❌ Cons: Removes beneficial minerals, water wastage
+
+🔆 ULTRAVIOLET (UV):
+✅ Removes: Bacteria, viruses, microorganisms
+✅ No Chemical Addition: Chemical-free purification
+✅ Retains: All minerals and TDS
+❌ Cons: Doesn't remove chemicals or heavy metals
+
+🧽 ULTRAFILTRATION (UF):
+✅ Removes: Bacteria, cysts, suspended particles
+✅ Retains: Essential minerals and salts
+✅ No Electricity: Gravity-based operation possible
+❌ Cons: Doesn't remove dissolved salts or chemicals
+
+🏆 BEST COMBINATIONS:
+• RO + UV + UF: Complete protection (our premium systems)
+• UV + UF: For low TDS water sources
+• RO + Mineralizer: RO benefits with mineral retention
+• Pre-filter + UV: Basic protection for clean sources
+
+💧 CHOOSING RIGHT TECHNOLOGY:
+• High TDS (>300): RO-based systems
+• Low TDS + bacterial risk: UV + UF
+• Chemical contamination: RO mandatory
+• Natural spring water: UV sufficient
+        """
+    },
+    "water_ph_levels": {
+        "title": "⚗️ Water pH Levels & Health Impact",
+        "content": """
+🔬 pH SCALE UNDERSTANDING:
+
+📊 pH RANGE: 0-14
+• 0-6.9: Acidic
+• 7.0: Neutral
+• 7.1-14: Alkaline/Basic
+
+🥤 DRINKING WATER pH STANDARDS:
+• WHO Standard: 6.5-8.5
+• Ideal Drinking: 7.0-8.5
+• Alkaline Water: 8.5-9.5
+• Pure RO Water: 6.0-7.0
+
+💊 HEALTH EFFECTS:
+
+🔸 ACIDIC WATER (Below 6.5):
+❌ May cause metallic taste
+❌ Can leach metals from pipes
+❌ Potential tooth enamel erosion
+❌ May contribute to acid reflux
+
+🔹 ALKALINE WATER (8.5-9.5):
+✅ May help neutralize body acid
+✅ Better hydration properties
+✅ Antioxidant benefits
+✅ Enhanced mineral absorption
+
+⚖️ BALANCED pH BENEFITS:
+• Optimal nutrient absorption
+• Better taste and odor
+• Safe for daily consumption
+• Supports body's natural pH
+
+🔧 pH ADJUSTMENT METHODS:
+• Alkaline cartridges (increases pH)
+• Mineral stones (natural alkalinization)
+• Carbon filters (removes chlorine affecting pH)
+• Remineralization (balances pH post-RO)
+
+💡 OUR pH SOLUTIONS:
+• Alkaline + RO systems
+• pH balancing cartridges
+• Mineral enhancement filters
+• Smart pH monitoring systems
+        """
+    },
+    "water_hardness": {
+        "title": "💎 Water Hardness & Softening Solutions",
+        "content": """
+🧪 WATER HARDNESS EXPLAINED:
+
+📏 HARDNESS LEVELS (ppm CaCO3):
+• Soft: 0-75 ppm
+• Moderately Hard: 75-150 ppm
+• Hard: 150-300 ppm
+• Very Hard: 300+ ppm
+
+🔍 CAUSES OF HARDNESS:
+• Calcium ions (Ca²⁺)
+• Magnesium ions (Mg²⁺)
+• Dissolved from limestone, chalk, gypsum
+
+⚠️ HARD WATER PROBLEMS:
+• Scale buildup in pipes and appliances
+• Soap scum and reduced lathering
+• Dry skin and hair issues
+• Increased detergent consumption
+• Reduced appliance lifespan
+
+💧 WATER SOFTENING METHODS:
+
+🧂 ION EXCHANGE SOFTENERS:
+✅ Removes calcium and magnesium
+✅ Replaces with sodium ions
+✅ Complete hardness removal
+❌ Adds sodium to water
+
+🔄 SALT-FREE CONDITIONERS:
+✅ Changes mineral structure
+✅ Reduces scale formation
+✅ No sodium addition
+❌ Doesn't remove hardness completely
+
+🌊 REVERSE OSMOSIS:
+✅ Removes hardness minerals
+✅ Also removes other contaminants
+✅ Produces soft, pure water
+❌ Removes beneficial minerals too
+
+💡 OUR SOFTENING SOLUTIONS:
+• Automatic water softeners
+• Salt-free water conditioners
+• RO with mineral retention
+• Combo softener + purifier systems
+
+🏠 APPLICATIONS:
+• Whole house softening systems
+• Point-of-use softeners
+• Commercial softening plants
+• Industrial water treatment
+        """
+    },
+    "chlorine_removal": {
+        "title": "🧪 Chlorine in Water & Removal Methods",
+        "content": """
+☢️ CHLORINE IN DRINKING WATER:
+
+🔬 WHY CHLORINE IS ADDED:
+• Disinfects water supply
+• Kills bacteria and viruses
+• Prevents waterborne diseases
+• Maintains water safety in distribution
+
+⚠️ CHLORINE SIDE EFFECTS:
+• Taste and odor issues
+• Skin and eye irritation
+• May form harmful byproducts (THMs)
+• Can affect beneficial gut bacteria
+• Potential respiratory irritation
+
+📊 SAFE CHLORINE LEVELS:
+• WHO Standard: Up to 5 ppm
+• Typical Municipal: 0.2-1.0 ppm
+• Taste/Odor Threshold: 0.2-0.6 ppm
+
+🔧 CHLORINE REMOVAL METHODS:
+
+🥥 ACTIVATED CARBON:
+✅ Highly effective chlorine removal
+✅ Improves taste and odor
+✅ Cost-effective solution
+✅ Easy maintenance
+
+💨 BOILING:
+✅ Simple home method
+✅ 100% effective
+❌ Time-consuming
+❌ Energy consumption
+
+🌊 REVERSE OSMOSIS:
+✅ Removes chlorine + other contaminants
+✅ Comprehensive purification
+❌ Higher cost
+❌ Water wastage
+
+🔆 UV TREATMENT:
+❌ Does NOT remove chlorine
+✅ Kills chlorine-resistant organisms
+✅ Works well with carbon pre-filter
+
+💡 OUR CHLORINE SOLUTIONS:
+• Multi-stage carbon filters
+• RO systems with carbon stages
+• Whole house carbon filters
+• Shower and bath filters
+
+🏠 BEST APPLICATIONS:
+• Kitchen: Under-sink carbon filters
+• Whole House: POE carbon systems
+• Shower: Carbon shower filters
+• Drinking: Multi-stage purifiers
+        """
+    }
+}
+
+def get_water_education_info(query):
+    """Get relevant water education information based on user query"""
+    query_lower = query.lower()
+    
+    # Keyword mapping for different topics
+    topic_keywords = {
+        "alkaline_water": ["alkaline", "ph", "alkaline water", "ionized", "antioxidant"],
+        "tds_information": ["tds", "total dissolved solids", "minerals", "ppm", "dissolved"],
+        "ro_vs_uv_uf": ["ro vs uv", "technology", "reverse osmosis", "ultraviolet", "ultrafiltration", "difference", "comparison"],
+        "water_ph_levels": ["ph level", "acidic", "basic", "ph scale", "acidity"],
+        "water_hardness": ["hard water", "softener", "hardness", "scale", "calcium", "magnesium"],
+        "chlorine_removal": ["chlorine", "taste", "odor", "chemical", "disinfection"]
+    }
+    
+    # Find matching topics
+    matching_topics = []
+    for topic, keywords in topic_keywords.items():
+        if any(keyword in query_lower for keyword in keywords):
+            matching_topics.append(topic)
+    
+    # Return relevant information
+    if matching_topics:
+        info_parts = []
+        for topic in matching_topics[:2]:  # Limit to 2 topics to avoid overwhelming
+            topic_info = WATER_KNOWLEDGE_BASE.get(topic, {})
+            if topic_info:
+                info_parts.append(f"{topic_info['title']}\n{topic_info['content']}")
+        return "\n\n" + "="*50 + "\n\n".join(info_parts)
+    
+    return None
+
+def is_educational_query(user_input):
+    """Check if the query is asking for educational information about water"""
+    educational_keywords = [
+        "what is", "benefits of", "advantage", "disadvantage", "how does", "why",
+        "explain", "difference", "comparison", "help", "information", "tell me about",
+        "alkaline", "ph", "tds", "hardness", "chlorine", "purification", "filtration"
+    ]
+    
+    query_lower = user_input.lower()
+    return any(keyword in query_lower for keyword in educational_keywords)
+
 prompt = ChatPromptTemplate.from_template("""
-You are a knowledgeable water treatment systems sales assistant. Help customers find the right products.
+You are a knowledgeable water treatment systems expert and educator. Help customers with both product recommendations and water education.
 
 IMPORTANT RULES:
 1. NEVER ask repetitive questions if the customer has already provided information
 2. If you have already shown products, don't ask the same questions again
 3. Provide detailed specifications and technical details for recommended products
-4. Focus on product benefits and features rather than asking more questions
-5. If the customer has asked about specific products, provide comprehensive information
+4. Answer educational questions about water treatment, health benefits, and water science
+5. Focus on being informative and educational while remaining conversational
+6. If asked about water benefits, alkaline water, TDS, pH, etc., provide comprehensive information
 
 📝 Available Products:
 {info}
+
+🎓 Water Education Content:
+{education_info}
 
 🗣️ Customer Question:
 {question}
@@ -54,13 +374,16 @@ IMPORTANT RULES:
 
 RESPONSE GUIDELINES:
 - If products are listed above, provide detailed information about them
-- Include technical specifications, features, capacity, price, and benefits
-- Mention installation requirements, maintenance, and warranty if relevant
+- If educational content is provided above, use it to answer water-related questions
+- Include technical specifications, features, capacity, price, and benefits for products
+- For educational queries, provide comprehensive, accurate information about water science
+- Mention installation requirements, maintenance, and warranty if relevant for products
 - Compare products if multiple options are available
 - Only ask clarifying questions if absolutely necessary and not asked before
 - Avoid repetitive greetings or the same questions
 - If customer says goodbye, respond briefly and politely
-- Focus on being helpful with detailed product information
+- Balance product recommendations with educational information as appropriate
+- Use the educational content provided to give detailed explanations about water benefits
 """)
 
 chain = prompt | model
@@ -69,7 +392,8 @@ user_context = {
     "asked_questions": set(),
     "shown_products": set(),
     "user_preferences": {},
-    "current_filter": None
+    "current_filter": None,
+    "educational_topics_covered": set()
 }
 
 def extract_keywords(user_input):
@@ -223,6 +547,9 @@ def analyze_conversation_context():
     if user_context["asked_questions"]:
         context.append(f"Previously asked about: {', '.join(list(user_context['asked_questions'])[:3])}")
     
+    if user_context["educational_topics_covered"]:
+        context.append(f"Educational topics covered: {', '.join(list(user_context['educational_topics_covered'])[:3])}")
+    
     return " | ".join(context) if context else "Fresh conversation"
 
 def handle_input(user_input):
@@ -230,41 +557,61 @@ def handle_input(user_input):
     
     try:
         # Update conversation context
-        user_context["asked_questions"].add(user_input.lower()[:50])  # Track question patterns
+        user_context["asked_questions"].add(user_input.lower()[:50])
         
-        # Enhanced product filtering
-        filtered_df = enhanced_product_filtering(user_input)
+        # Check if this is an educational query
+        is_educational = is_educational_query(user_input)
+        education_info = ""
         
-        # Get top relevant products (limit to avoid overwhelming)
-        top_products = filtered_df.head(8) if not filtered_df.empty else df.head(5)
+        if is_educational:
+            education_content = get_water_education_info(user_input)
+            if education_content:
+                education_info = education_content
+                # Track educational topics covered
+                for topic in WATER_KNOWLEDGE_BASE.keys():
+                    if any(keyword in user_input.lower() for keyword in topic.split('_')):
+                        user_context["educational_topics_covered"].add(topic)
         
-        # Create detailed product documents
+        # Enhanced product filtering (only if not purely educational)
+        product_info = ""
         docs = []
-        for _, row in top_products.iterrows():
-            product_name = row.get("Name", "")
-            user_context["shown_products"].add(product_name)
+        
+        if not is_educational or any(keyword in user_input.lower() for keyword in ["system", "purifier", "recommend", "buy", "price"]):
+            filtered_df = enhanced_product_filtering(user_input)
             
-            detailed_info = create_detailed_product_info(row)
-            docs.append(Document(page_content=detailed_info))
+            # Get top relevant products (limit to avoid overwhelming)
+            top_products = filtered_df.head(5) if not filtered_df.empty else df.head(3)
+            
+            # Create detailed product documents
+            for _, row in top_products.iterrows():
+                product_name = row.get("Name", "")
+                user_context["shown_products"].add(product_name)
+                
+                detailed_info = create_detailed_product_info(row)
+                docs.append(Document(page_content=detailed_info))
+            
+            # Fallback to vector search if no direct matches and not purely educational
+            if filtered_df.empty and not is_educational:
+                vector_docs = retriever.get_relevant_documents(user_input)
+                docs.extend(vector_docs[:2])
+            
+            if docs:
+                product_info = "\n\n".join(d.page_content for d in docs[:3])
         
-        # Fallback to vector search if no direct matches
-        if filtered_df.empty:
-            vector_docs = retriever.get_relevant_documents(user_input)
-            docs.extend(vector_docs[:3])  # Limit vector results
-        
-        if not docs:
-            gui.display_reply("❌ Sorry, I couldn't find any matching water treatment products. Could you try describing what type of system you need?")
+        # If no products found and no educational content, provide helpful message
+        if not docs and not education_info:
+            gui.display_reply("❌ I couldn't find specific products for your query. Could you try asking about specific water treatment systems or water-related topics? I can help with product recommendations and explain water treatment benefits.")
             return
         
         # Prepare context for LLM
-        product_info = "\n\n".join(d.page_content for d in docs[:5])  # Limit to top 5 products
-        recent_history = "\n".join(conversation_history[-6:])  # Last 3 exchanges
+        recent_history = "\n".join(conversation_history[-6:])
         context_analysis = analyze_conversation_context()
         
         payload = {
             "history": recent_history,
             "question": user_input,
             "info": product_info,
+            "education_info": education_info,
             "context_analysis": context_analysis
         }
         
@@ -277,7 +624,6 @@ def handle_input(user_input):
         # Handle image display for single product matches
         if len(docs) == 1 and hasattr(docs[0], 'page_content'):
             try:
-                # Extract product name from detailed info
                 product_name_match = re.search(r"🏷️ PRODUCT: (.+)", docs[0].page_content)
                 if product_name_match:
                     product_name = product_name_match.group(1).strip()
@@ -285,7 +631,6 @@ def handle_input(user_input):
                     if not product_row.empty:
                         image_url = product_row.iloc[0].get("Images", "")
                         if image_url and image_url.startswith("http"):
-                            # Take first image if multiple URLs
                             first_image = image_url.split(",")[0].strip()
                             gui.display_image(first_image)
             except Exception as img_error:
@@ -293,7 +638,7 @@ def handle_input(user_input):
         
         # Update conversation history
         conversation_history.append(f"User: {user_input}")
-        conversation_history.append(f"Bot: {final_response[:200]}...")  # Truncate for memory
+        conversation_history.append(f"Bot: {final_response[:200]}...")
         
         # Keep conversation history manageable
         if len(conversation_history) > 12:

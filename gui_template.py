@@ -100,7 +100,15 @@ class ChatGUI:
             self.typing_label = None
 
     def insert_welcome_message(self):
-        welcome = "👋 Welcome! Ask me about RO systems, softeners, UV purifiers, and other water treatment products."
+        welcome = """👋 Hello! I'm your Water Treatment Expert Assistant.
+
+🔹 I can help you with:
+• Product recommendations (RO, UV, UF systems)
+• Water science education (alkaline water, TDS, pH)
+• Technology comparisons and benefits
+• Finding the right system for your needs
+
+💬 Just ask me anything about water treatment or say hello to get started!"""
         timestamp = datetime.now().strftime("%H:%M")
         self.insert_message("Bot", welcome, "#444444", anchor="w", timestamp=timestamp)
 

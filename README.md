@@ -44,6 +44,14 @@ An intelligent chatbot for water treatment product recommendations using advance
 - **Enhanced Welcome Message**: Informative startup message explaining capabilities
 - **Context-Aware Responses**: Tracks conversation flow and interaction history
 
+### 7. **Consultative Sales Approach**
+- **Needs Assessment First**: Gathers customer requirements before suggesting products
+- **Requirement Tracking**: Tracks usage type, capacity, budget, water source, concerns
+- **Smart Questioning**: Asks relevant questions based on missing information
+- **Targeted Recommendations**: Suggests products only after understanding needs
+- **Personalized Filtering**: Filters products based on collected requirements
+- **Solution-Oriented**: Explains WHY recommended products suit specific needs
+
 ## 📋 Features
 
 - **GUI Interface**: Clean, modern chat interface with dark theme
@@ -57,6 +65,8 @@ An intelligent chatbot for water treatment product recommendations using advance
 - **Smart Content Delivery**: Combines product recommendations with educational information
 - **Natural Conversation**: Proper greeting handling and conversation flow management
 - **Welcome Experience**: Informative startup message explaining all capabilities
+- **Consultative Approach**: Understands customer needs before making recommendations
+- **Requirement Gathering**: Systematically collects usage, budget, capacity, and concern information
 
 ## 🛠️ Setup Instructions
 
@@ -139,6 +149,29 @@ I'm your Water Treatment Expert, and I'm here to help you with:
 🔹 **Health Benefits**: Discover how water quality affects your health
 
 What would you like to know about water treatment today? 😊"
+
+User: "I need a water purifier"
+Bot: "🔍 **To recommend the perfect water treatment system for you, I'd like to understand your needs better:**
+
+🏠 **Where will you be using this water treatment system?** (Home, Office, or Industrial facility)
+
+👨‍👩‍👧‍👦 **How many people will be using the system?** (Family size helps determine capacity)
+
+💡 This information helps me suggest the most suitable and cost-effective solution for your specific requirements!"
+
+User: "For my home, family of 4"
+Bot: "Great! Now I can recommend systems perfect for a family of 4:
+
+🏷️ PRODUCT: ATROS Swift
+💰 PRICE: ₹25,000
+📂 CATEGORY: Domestic RO Systems
+⚡ KEY FEATURES: RO+UV+UF with TDS Adjuster
+
+**Why this suits your needs:**
+✅ Perfect for family of 4 (12-15 liters storage)
+✅ Domestic use with compact design
+✅ Complete protection with RO+UV+UF technology
+✅ Affordable solution within typical home budgets"
 ```
 
 ## 🔧 Technical Architecture
@@ -167,6 +200,7 @@ What would you like to know about water treatment today? 😊"
 6. ✅ **Water Education**: Comprehensive knowledge base about water science
 7. ✅ **Educational Q&A**: Answers water treatment and health questions
 8. ✅ **Natural Conversation Flow**: Proper greeting and farewell handling
+9. ✅ **Consultative Sales Process**: Understands needs before recommending products
 
 ## 🧪 Educational Topics Covered
 

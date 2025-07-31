@@ -346,6 +346,126 @@ def is_educational_query(user_input):
     query_lower = user_input.lower()
     return any(keyword in query_lower for keyword in educational_keywords)
 
+def is_product_inquiry(user_input):
+    """Check if the user is asking about products or wants to buy something"""
+    product_keywords = [
+        "show me", "i need", "i want", "looking for", "recommend", "suggest",
+        "buy", "purchase", "price", "cost", "system", "purifier", "filter",
+        "ro", "uv", "uf", "plant", "machine", "softener", "products"
+    ]
+    
+    query_lower = user_input.lower()
+    return any(keyword in query_lower for keyword in product_keywords)
+
+def extract_user_requirements(user_input):
+    """Extract user requirements from their input"""
+    query_lower = user_input.lower()
+    needs = user_context["needs_assessment"]
+    
+    # Extract usage type
+    if any(word in query_lower for word in ["home", "house", "family", "domestic", "residential"]):
+        needs["usage_type"] = "domestic"
+    elif any(word in query_lower for word in ["office", "commercial", "business", "company"]):
+        needs["usage_type"] = "commercial"
+    elif any(word in query_lower for word in ["factory", "industrial", "plant", "manufacturing"]):
+        needs["usage_type"] = "industrial"
+    
+    # Extract capacity hints
+    if any(word in query_lower for word in ["small family", "2-3 people", "few people"]):
+        needs["capacity_needed"] = "small"
+    elif any(word in query_lower for word in ["large family", "5-6 people", "big family"]):
+        needs["capacity_needed"] = "large"
+    elif any(word in query_lower for word in ["office", "50 people", "100 people"]):
+        needs["capacity_needed"] = "office"
+    
+    # Extract budget information
+    budget_match = re.search(r"budget.*?(\d{4,6})|under.*?(\d{4,6})|below.*?(\d{4,6})", query_lower)
+    if budget_match:
+        budget_value = next(filter(None, budget_match.groups()))
+        needs["budget_range"] = int(budget_value)
+    
+    # Extract water source
+    if any(word in query_lower for word in ["borewell", "bore well", "groundwater", "well water"]):
+        needs["water_source"] = "borewell"
+    elif any(word in query_lower for word in ["municipal", "corporation", "tap water"]):
+        needs["water_source"] = "municipal"
+    elif any(word in query_lower for word in ["tanker", "tank water", "delivered water"]):
+        needs["water_source"] = "tanker"
+    
+    # Extract specific concerns
+    concerns = []
+    if any(word in query_lower for word in ["taste", "bad taste", "bitter"]):
+        concerns.append("taste issues")
+    if any(word in query_lower for word in ["hard water", "scale", "soap"]):
+        concerns.append("water hardness")
+    if any(word in query_lower for word in ["high tds", "tds", "dissolved solids"]):
+        concerns.append("high TDS")
+    if any(word in query_lower for word in ["bacteria", "contamination", "infection"]):
+        concerns.append("bacterial contamination")
+    if any(word in query_lower for word in ["chlorine", "chemical smell"]):
+        concerns.append("chlorine/chemicals")
+    
+    if concerns:
+        needs["specific_concerns"].extend(concerns)
+        needs["specific_concerns"] = list(set(needs["specific_concerns"]))  # Remove duplicates
+
+def get_needs_assessment_questions():
+    """Generate questions to understand customer needs"""
+    needs = user_context["needs_assessment"]
+    questions = []
+    
+    if not needs["usage_type"]:
+        questions.append("🏠 **Where will you be using this water treatment system?** (Home, Office, or Industrial facility)")
+    
+    if not needs["capacity_needed"] and needs["usage_type"]:
+        if needs["usage_type"] == "domestic":
+            questions.append("👨‍👩‍👧‍👦 **How many people will be using the system?** (Family size helps determine capacity)")
+        elif needs["usage_type"] == "commercial":
+            questions.append("🏢 **How many people work in your office?** (This helps determine daily water requirement)")
+        elif needs["usage_type"] == "industrial":
+            questions.append("🏭 **What's your daily water requirement?** (In liters per hour or per day)")
+    
+    if not needs["water_source"]:
+        questions.append("🚰 **What's your water source?** (Municipal supply, Borewell, or Tanker water)")
+    
+    if not needs["budget_range"]:
+        questions.append("💰 **What's your budget range?** (This helps me recommend the best system for your needs)")
+    
+    if not needs["specific_concerns"]:
+        questions.append("⚠️ **Any specific water quality issues?** (Bad taste, hardness, high TDS, contamination concerns)")
+    
+    return questions[:2]  # Limit to 2 questions at a time to avoid overwhelming
+
+def check_if_requirements_sufficient():
+    """Check if we have enough information to make recommendations"""
+    needs = user_context["needs_assessment"]
+    essential_info = [
+        needs["usage_type"] is not None,
+        needs["capacity_needed"] is not None or needs["usage_type"] == "industrial",
+        needs["water_source"] is not None or len(needs["specific_concerns"]) > 0
+    ]
+    
+    return sum(essential_info) >= 2  # Need at least 2 essential pieces of information
+
+def generate_needs_assessment_response():
+    """Generate response for needs assessment"""
+    questions = get_needs_assessment_questions()
+    
+    if not questions:
+        user_context["needs_assessment"]["requirements_gathered"] = True
+        return None
+    
+    response = """🔍 **To recommend the perfect water treatment system for you, I'd like to understand your needs better:**
+
+"""
+    
+    for i, question in enumerate(questions, 1):
+        response += f"{question}\n\n"
+    
+    response += "💡 This information helps me suggest the most suitable and cost-effective solution for your specific requirements!"
+    
+    return response
+
 def is_greeting(user_input):
     """Check if the user input is a greeting"""
     greeting_keywords = [
@@ -413,19 +533,19 @@ What brings you here today? I'm ready to help! ✨"""
     return random.choice(responses)
 
 prompt = ChatPromptTemplate.from_template("""
-You are a knowledgeable water treatment systems expert and educator. Help customers with both product recommendations and water education.
+You are a knowledgeable water treatment systems consultant and educator. You follow a consultative approach - understanding customer needs before recommending products.
 
 IMPORTANT RULES:
 1. NEVER ask repetitive questions if the customer has already provided information
-2. If you have already shown products, don't ask the same questions again
+2. If products are shown, they are already filtered based on customer requirements
 3. Provide detailed specifications and technical details for recommended products
 4. Answer educational questions about water treatment, health benefits, and water science
 5. Focus on being informative and educational while remaining conversational
 6. If asked about water benefits, alkaline water, TDS, pH, etc., provide comprehensive information
 7. Do NOT handle greetings or goodbyes - they are handled separately
-8. Focus on technical and educational content only
+8. When recommending products, explain WHY they suit the customer's specific needs
 
-📝 Available Products:
+📝 Recommended Products (Pre-filtered based on customer needs):
 {info}
 
 🎓 Water Education Content:
@@ -440,18 +560,25 @@ IMPORTANT RULES:
 🎯 Context Analysis:
 {context_analysis}
 
-RESPONSE GUIDELINES:
-- If products are listed above, provide detailed information about them
+RESPONSE GUIDELINES FOR PRODUCT RECOMMENDATIONS:
+- Products listed above are already filtered for the customer's specific requirements
+- Explain HOW each product addresses their particular needs (usage type, capacity, budget, concerns)
+- Include technical specifications, features, capacity, price, and benefits
+- Mention why this product is suitable for their specific situation
+- Compare products if multiple options are available, highlighting differences
+- Include installation requirements, maintenance, and warranty information
+- Prioritize products that best match their stated requirements
+
+RESPONSE GUIDELINES FOR EDUCATION:
 - If educational content is provided above, use it to answer water-related questions
-- Include technical specifications, features, capacity, price, and benefits for products
-- For educational queries, provide comprehensive, accurate information about water science
-- Mention installation requirements, maintenance, and warranty if relevant for products
-- Compare products if multiple options are available
-- Only ask clarifying questions if absolutely necessary and not asked before
-- Avoid repetitive content or the same questions
-- Balance product recommendations with educational information as appropriate
-- Use the educational content provided to give detailed explanations about water benefits
+- Provide comprehensive, accurate information about water science
+- Connect educational content to practical applications when relevant
+
+GENERAL GUIDELINES:
 - Be helpful, informative, and professional
+- Avoid repetitive content or questions
+- Balance product recommendations with educational information as appropriate
+- Focus on customer value and solving their specific problems
 """)
 
 chain = prompt | model
@@ -462,7 +589,17 @@ user_context = {
     "user_preferences": {},
     "current_filter": None,
     "educational_topics_covered": set(),
-    "has_greeted": False
+    "has_greeted": False,
+    "needs_assessment": {
+        "usage_type": None,  # domestic, commercial, industrial
+        "capacity_needed": None,  # family size, office size, etc.
+        "budget_range": None,
+        "water_source": None,  # municipal, borewell, tanker
+        "specific_concerns": [],  # taste, hardness, tds, bacteria
+        "location": None,  # home, office, factory
+        "current_system": None,  # existing system if any
+        "requirements_gathered": False
+    }
 }
 
 def extract_keywords(user_input):
@@ -514,50 +651,120 @@ def normalize_keywords(keywords):
     return list(normalized)
 
 def enhanced_product_filtering(user_input):
-    """Improved product filtering with better matching logic"""
+    """Improved product filtering based on user requirements and query"""
     keywords = normalize_keywords(extract_keywords(user_input))
     filtered_df = df.copy()
+    needs = user_context["needs_assessment"]
     
-    # Apply price filter if specified
-    max_price = user_context["user_preferences"].get("max_price")
-    if max_price:
-        filtered_df = filtered_df[filtered_df["Regular_price"] <= max_price]
+    # Apply budget filter from needs assessment or query
+    budget_limit = needs.get("budget_range") or user_context["user_preferences"].get("max_price")
+    if budget_limit:
+        filtered_df = filtered_df[filtered_df["Regular_price"] <= budget_limit]
     
-    # Category-based filtering
-    category_keywords = {
-        "industrial": ["industrial", "commercial"],
-        "domestic": ["domestic", "home"],
-        "atm": ["atm", "vending", "coin"],
-        "softener": ["softener"]
-    }
-    
-    for category, cat_keywords in category_keywords.items():
-        if any(kw in keywords for kw in cat_keywords):
-            category_filter = "|".join(cat_keywords)
+    # Filter by usage type from needs assessment
+    if needs["usage_type"]:
+        if needs["usage_type"] == "domestic":
+            domestic_filter = "domestic|home|residential"
             filtered_df = filtered_df[
-                filtered_df["Category"].str.contains(category_filter, case=False, na=False) |
-                filtered_df["Name"].str.contains(category_filter, case=False, na=False)
+                filtered_df["Category"].str.contains(domestic_filter, case=False, na=False)
+            ]
+        elif needs["usage_type"] == "commercial":
+            commercial_filter = "commercial|office|business"
+            filtered_df = filtered_df[
+                filtered_df["Category"].str.contains(commercial_filter, case=False, na=False) |
+                filtered_df["Name"].str.contains(commercial_filter, case=False, na=False)
+            ]
+        elif needs["usage_type"] == "industrial":
+            industrial_filter = "industrial|plant"
+            filtered_df = filtered_df[
+                filtered_df["Category"].str.contains(industrial_filter, case=False, na=False)
             ]
     
-    # Technology-based filtering (RO, UV, UF)
-    tech_keywords = ["ro", "uv", "uf"]
-    tech_present = [kw for kw in tech_keywords if kw in keywords]
-    if tech_present:
-        tech_pattern = "|".join(tech_present)
-        filtered_df = filtered_df[
-            filtered_df["Name"].str.contains(tech_pattern, case=False, na=False) |
-            filtered_df["Short description"].str.contains(tech_pattern, case=False, na=False)
-        ]
+    # Filter by specific concerns
+    if needs["specific_concerns"]:
+        concern_filters = []
+        for concern in needs["specific_concerns"]:
+            if "hardness" in concern:
+                concern_filters.append("softener|softner")
+            elif "high TDS" in concern:
+                concern_filters.append("ro|reverse osmosis")
+            elif "bacterial" in concern:
+                concern_filters.append("uv|uv")
+            elif "chlorine" in concern:
+                concern_filters.append("carbon|activated")
+        
+        if concern_filters:
+            concern_pattern = "|".join(concern_filters)
+            filtered_df = filtered_df[
+                filtered_df["Name"].str.contains(concern_pattern, case=False, na=False) |
+                filtered_df["Short description"].str.contains(concern_pattern, case=False, na=False)
+            ]
     
-    # General keyword matching
+    # Filter by water source considerations
+    if needs["water_source"]:
+        if needs["water_source"] == "borewell":
+            # Borewell water typically needs RO due to high TDS
+            filtered_df = filtered_df[
+                filtered_df["Name"].str.contains("ro", case=False, na=False) |
+                filtered_df["Short description"].str.contains("ro", case=False, na=False)
+            ]
+        elif needs["water_source"] == "municipal":
+            # Municipal water typically needs UV/UF for bacterial protection
+            filtered_df = filtered_df[
+                filtered_df["Name"].str.contains("uv|uf", case=False, na=False) |
+                filtered_df["Short description"].str.contains("uv|uf", case=False, na=False)
+            ]
+    
+    # Apply capacity-based filtering
+    if needs["capacity_needed"]:
+        if needs["capacity_needed"] == "small":
+            # Small capacity systems (typically under 15 LPH)
+            small_systems = filtered_df[
+                filtered_df["Description"].str.contains("12|15|10", case=False, na=False) |
+                filtered_df["Name"].str.contains("domestic|home", case=False, na=False)
+            ]
+            if not small_systems.empty:
+                filtered_df = small_systems
+        elif needs["capacity_needed"] == "large":
+            # Large capacity systems
+            large_systems = filtered_df[
+                filtered_df["Description"].str.contains("20|25|30", case=False, na=False) |
+                filtered_df["Name"].str.contains("premium|advance", case=False, na=False)
+            ]
+            if not large_systems.empty:
+                filtered_df = large_systems
+        elif needs["capacity_needed"] == "office":
+            # Office/commercial systems
+            office_systems = filtered_df[
+                filtered_df["Category"].str.contains("commercial", case=False, na=False) |
+                filtered_df["Description"].str.contains("office|commercial", case=False, na=False)
+            ]
+            if not office_systems.empty:
+                filtered_df = office_systems
+    
+    # Apply keyword-based filtering from current query
     if keywords:
+        tech_keywords = ["ro", "uv", "uf"]
+        tech_present = [kw for kw in tech_keywords if kw in keywords]
+        if tech_present:
+            tech_pattern = "|".join(tech_present)
+            tech_filtered = filtered_df[
+                filtered_df["Name"].str.contains(tech_pattern, case=False, na=False) |
+                filtered_df["Short description"].str.contains(tech_pattern, case=False, na=False)
+            ]
+            if not tech_filtered.empty:
+                filtered_df = tech_filtered
+        
+        # General keyword matching
         keyword_pattern = "|".join(re.escape(kw) for kw in keywords)
-        filtered_df = filtered_df[
+        keyword_filtered = filtered_df[
             filtered_df["Name"].str.contains(keyword_pattern, case=False, na=False) |
             filtered_df["Short description"].str.contains(keyword_pattern, case=False, na=False) |
             filtered_df["Category"].str.contains(keyword_pattern, case=False, na=False) |
             filtered_df["Description"].str.contains(keyword_pattern, case=False, na=False)
         ]
+        if not keyword_filtered.empty:
+            filtered_df = keyword_filtered
     
     return filtered_df
 
@@ -605,19 +812,32 @@ def create_detailed_product_info(row):
 def analyze_conversation_context():
     """Analyze conversation context to avoid repetitive questions"""
     context = []
+    needs = user_context["needs_assessment"]
+    
+    # Include needs assessment status
+    if needs["requirements_gathered"]:
+        requirements = []
+        if needs["usage_type"]:
+            requirements.append(f"Usage: {needs['usage_type']}")
+        if needs["capacity_needed"]:
+            requirements.append(f"Capacity: {needs['capacity_needed']}")
+        if needs["budget_range"]:
+            requirements.append(f"Budget: ₹{needs['budget_range']:,}")
+        if needs["water_source"]:
+            requirements.append(f"Source: {needs['water_source']}")
+        if needs["specific_concerns"]:
+            requirements.append(f"Concerns: {', '.join(needs['specific_concerns'][:2])}")
+        
+        if requirements:
+            context.append(f"Customer requirements: {' | '.join(requirements[:3])}")
+    else:
+        context.append("Requirements being assessed")
     
     if user_context["shown_products"]:
-        context.append(f"Already shown {len(user_context['shown_products'])} products")
-    
-    if user_context["user_preferences"]:
-        prefs = ", ".join(f"{k}: {v}" for k, v in user_context["user_preferences"].items())
-        context.append(f"User preferences: {prefs}")
-    
-    if user_context["asked_questions"]:
-        context.append(f"Previously asked about: {', '.join(list(user_context['asked_questions'])[:3])}")
+        context.append(f"Products shown: {len(user_context['shown_products'])}")
     
     if user_context["educational_topics_covered"]:
-        context.append(f"Educational topics covered: {', '.join(list(user_context['educational_topics_covered'])[:3])}")
+        context.append(f"Education provided: {', '.join(list(user_context['educational_topics_covered'])[:2])}")
     
     return " | ".join(context) if context else "Fresh conversation"
 
@@ -656,6 +876,9 @@ Have a great day and stay hydrated! 💧✨"""
             conversation_history.append(f"Bot: [Farewell response]")
             return
         
+        # Always extract user requirements from their input
+        extract_user_requirements(user_input)
+        
         # Check if this is an educational query
         is_educational = is_educational_query(user_input)
         education_info = ""
@@ -669,11 +892,30 @@ Have a great day and stay hydrated! 💧✨"""
                     if any(keyword in user_input.lower() for keyword in topic.split('_')):
                         user_context["educational_topics_covered"].add(topic)
         
-        # Enhanced product filtering (only if not purely educational)
+        # Check if this is a product inquiry
+        is_product_request = is_product_inquiry(user_input)
+        
+        # If it's a product inquiry but we don't have enough requirements, ask for needs assessment
+        if is_product_request and not user_context["needs_assessment"]["requirements_gathered"]:
+            if not check_if_requirements_sufficient():
+                needs_response = generate_needs_assessment_response()
+                if needs_response:
+                    gui.display_reply(needs_response)
+                    
+                    # Update conversation history
+                    conversation_history.append(f"User: {user_input}")
+                    conversation_history.append(f"Bot: [Needs assessment questions]")
+                    return
+            else:
+                # Mark requirements as gathered if we have sufficient information
+                user_context["needs_assessment"]["requirements_gathered"] = True
+        
+        # Enhanced product filtering (only if requirements are gathered or it's educational)
         product_info = ""
         docs = []
         
-        if not is_educational or any(keyword in user_input.lower() for keyword in ["system", "purifier", "recommend", "buy", "price"]):
+        if (is_product_request and user_context["needs_assessment"]["requirements_gathered"]) or \
+           (not is_educational and not is_product_request and user_context["needs_assessment"]["requirements_gathered"]):
             filtered_df = enhanced_product_filtering(user_input)
             
             # Get top relevant products (limit to avoid overwhelming)
@@ -687,17 +929,22 @@ Have a great day and stay hydrated! 💧✨"""
                 detailed_info = create_detailed_product_info(row)
                 docs.append(Document(page_content=detailed_info))
             
-            # Fallback to vector search if no direct matches and not purely educational
-            if filtered_df.empty and not is_educational:
+            # Fallback to vector search if no direct matches
+            if filtered_df.empty:
                 vector_docs = retriever.get_relevant_documents(user_input)
                 docs.extend(vector_docs[:2])
             
             if docs:
                 product_info = "\n\n".join(d.page_content for d in docs[:3])
         
-        # If no products found and no educational content, provide helpful message
-        if not docs and not education_info:
-            gui.display_reply("❌ I couldn't find specific products for your query. Could you try asking about specific water treatment systems or water-related topics? I can help with product recommendations and explain water treatment benefits.")
+        # If it's a product request but no products found and no educational content
+        if is_product_request and not docs and not education_info and user_context["needs_assessment"]["requirements_gathered"]:
+            gui.display_reply("❌ I couldn't find specific products matching your requirements. Could you provide more details about what you're looking for? I can help you find the right water treatment solution.")
+            return
+        
+        # If no relevant response can be generated
+        if not docs and not education_info and not is_product_request:
+            gui.display_reply("💬 I'm here to help with water treatment systems and water quality questions. You can ask me about:\n\n• Product recommendations (just tell me your needs first)\n• Water science (alkaline water, TDS, pH levels)\n• Technology comparisons (RO vs UV vs UF)\n• Water quality issues and solutions\n\nWhat would you like to know?")
             return
         
         # Prepare context for LLM

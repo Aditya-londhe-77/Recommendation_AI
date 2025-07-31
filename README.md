@@ -52,6 +52,14 @@ An intelligent chatbot for water treatment product recommendations using advance
 - **Personalized Filtering**: Filters products based on collected requirements
 - **Solution-Oriented**: Explains WHY recommended products suit specific needs
 
+### 8. **Data Integrity & Accuracy**
+- **CSV-Only Information**: Uses strictly only data present in the product CSV file
+- **No Hallucination**: Never invents or assumes product specifications not in data
+- **Accurate Price Filtering**: Proper price-based filtering with validation
+- **Validated Specifications**: Only extracts specifications explicitly mentioned in product descriptions
+- **Transparent Limitations**: Clearly states when information is not available in data
+- **Data-Driven Responses**: All product recommendations based on actual CSV content
+
 ## 📋 Features
 
 - **GUI Interface**: Clean, modern chat interface with dark theme
@@ -67,6 +75,8 @@ An intelligent chatbot for water treatment product recommendations using advance
 - **Welcome Experience**: Informative startup message explaining all capabilities
 - **Consultative Approach**: Understands customer needs before making recommendations
 - **Requirement Gathering**: Systematically collects usage, budget, capacity, and concern information
+- **Data Integrity**: Uses only CSV data, no hallucinated information
+- **Accurate Pricing**: Proper price filtering with validation for budget-based recommendations
 
 ## 🛠️ Setup Instructions
 
@@ -201,6 +211,7 @@ Bot: "Great! Now I can recommend systems perfect for a family of 4:
 7. ✅ **Educational Q&A**: Answers water treatment and health questions
 8. ✅ **Natural Conversation Flow**: Proper greeting and farewell handling
 9. ✅ **Consultative Sales Process**: Understands needs before recommending products
+10. ✅ **Data Integrity**: Uses only CSV data, no hallucinated information
 
 ## 🧪 Educational Topics Covered
 

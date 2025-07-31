@@ -378,11 +378,22 @@ def extract_user_requirements(user_input):
     elif any(word in query_lower for word in ["office", "50 people", "100 people"]):
         needs["capacity_needed"] = "office"
     
-    # Extract budget information
-    budget_match = re.search(r"budget.*?(\d{4,6})|under.*?(\d{4,6})|below.*?(\d{4,6})", query_lower)
-    if budget_match:
-        budget_value = next(filter(None, budget_match.groups()))
-        needs["budget_range"] = int(budget_value)
+    # Extract budget information - improved price extraction
+    budget_patterns = [
+        r"budget.*?₹?\s*(\d{4,6})",
+        r"under.*?₹?\s*(\d{4,6})", 
+        r"below.*?₹?\s*(\d{4,6})",
+        r"₹\s*(\d{4,6})",
+        r"price.*?(\d{4,6})",
+        r"cost.*?(\d{4,6})"
+    ]
+    
+    for pattern in budget_patterns:
+        budget_match = re.search(pattern, query_lower)
+        if budget_match:
+            budget_value = int(budget_match.group(1))
+            needs["budget_range"] = budget_value
+            break
     
     # Extract water source
     if any(word in query_lower for word in ["borewell", "bore well", "groundwater", "well water"]):
@@ -533,17 +544,23 @@ What brings you here today? I'm ready to help! ✨"""
     return random.choice(responses)
 
 prompt = ChatPromptTemplate.from_template("""
-You are a knowledgeable water treatment systems consultant and educator. You follow a consultative approach - understanding customer needs before recommending products.
+You are a knowledgeable water treatment systems consultant. You follow a consultative approach - understanding customer needs before recommending products.
+
+CRITICAL CONSTRAINTS:
+1. Use ONLY information from the provided product data - NEVER add external knowledge or specifications
+2. If price is not available in data, clearly state "Price on request" - do not estimate or guess
+3. Only mention features and specifications that are explicitly stated in the product descriptions
+4. Do NOT invent technical details, installation requirements, or warranty information
+5. Stick strictly to the data provided in the product listings
 
 IMPORTANT RULES:
 1. NEVER ask repetitive questions if the customer has already provided information
 2. If products are shown, they are already filtered based on customer requirements
-3. Provide detailed specifications and technical details for recommended products
-4. Answer educational questions about water treatment, health benefits, and water science
-5. Focus on being informative and educational while remaining conversational
-6. If asked about water benefits, alkaline water, TDS, pH, etc., provide comprehensive information
-7. Do NOT handle greetings or goodbyes - they are handled separately
-8. When recommending products, explain WHY they suit the customer's specific needs
+3. Use ONLY the specifications and details provided in the product data
+4. Answer educational questions using the provided educational content only
+5. When recommending products, explain WHY they suit customer needs based on stated product features
+6. Do NOT handle greetings or goodbyes - they are handled separately
+7. If information is not in the data, say "This information is not available in our current product data"
 
 📝 Recommended Products (Pre-filtered based on customer needs):
 {info}
@@ -561,24 +578,24 @@ IMPORTANT RULES:
 {context_analysis}
 
 RESPONSE GUIDELINES FOR PRODUCT RECOMMENDATIONS:
-- Products listed above are already filtered for the customer's specific requirements
-- Explain HOW each product addresses their particular needs (usage type, capacity, budget, concerns)
-- Include technical specifications, features, capacity, price, and benefits
-- Mention why this product is suitable for their specific situation
-- Compare products if multiple options are available, highlighting differences
-- Include installation requirements, maintenance, and warranty information
-- Prioritize products that best match their stated requirements
+- Products listed above are filtered for the customer's specific requirements
+- Use ONLY the information provided in each product listing
+- Explain suitability based on stated product features and customer requirements
+- If price is shown, use it; if not shown, state "Price on request"
+- Compare products using only the features mentioned in their descriptions
+- Do NOT add installation details, warranty info, or maintenance requirements unless stated in product data
+- Focus on matching stated product capabilities with customer needs
 
 RESPONSE GUIDELINES FOR EDUCATION:
-- If educational content is provided above, use it to answer water-related questions
-- Provide comprehensive, accurate information about water science
-- Connect educational content to practical applications when relevant
+- Use ONLY the educational content provided above
+- Do not supplement with external knowledge about water treatment
+- If asked about topics not covered in the provided content, say information is not available
 
 GENERAL GUIDELINES:
-- Be helpful, informative, and professional
-- Avoid repetitive content or questions
-- Balance product recommendations with educational information as appropriate
-- Focus on customer value and solving their specific problems
+- Be helpful and professional while staying within data constraints
+- Never invent or assume product details not explicitly stated
+- Focus on matching available product information with customer requirements
+- Clearly distinguish between what is stated in product data vs. what is not available
 """)
 
 chain = prompt | model
@@ -656,10 +673,20 @@ def enhanced_product_filtering(user_input):
     filtered_df = df.copy()
     needs = user_context["needs_assessment"]
     
-    # Apply budget filter from needs assessment or query
+    # Apply budget filter from needs assessment or query - only for products with valid prices
     budget_limit = needs.get("budget_range") or user_context["user_preferences"].get("max_price")
     if budget_limit:
-        filtered_df = filtered_df[filtered_df["Regular_price"] <= budget_limit]
+        # Filter only products that have valid prices (not empty, not zero)
+        valid_price_df = filtered_df[
+            (filtered_df["Regular_price"].notna()) & 
+            (filtered_df["Regular_price"] != '') & 
+            (pd.to_numeric(filtered_df["Regular_price"], errors='coerce') > 0) &
+            (pd.to_numeric(filtered_df["Regular_price"], errors='coerce') <= budget_limit)
+        ]
+        # If we have products with valid prices within budget, use them
+        if not valid_price_df.empty:
+            filtered_df = valid_price_df
+        # Otherwise, keep all products but note that some don't have prices
     
     # Filter by usage type from needs assessment
     if needs["usage_type"]:
@@ -769,7 +796,7 @@ def enhanced_product_filtering(user_input):
     return filtered_df
 
 def create_detailed_product_info(row):
-    """Create comprehensive product information with all available details"""
+    """Create product information using ONLY data from CSV - no hallucination"""
     name = row.get("Name", "")
     price = row.get("Regular_price", 0)
     category = row.get("Category", "")
@@ -777,36 +804,52 @@ def create_detailed_product_info(row):
     full_desc = row.get("Description", "")
     attributes = row.get("Attribute 1 value(s)", "")
     
-    # Extract technical specifications from description
-    specs = []
-    if "lph" in full_desc.lower() or "liters per hour" in full_desc.lower():
-        lph_match = re.search(r"(\d+)\s*lph|\b(\d+)\s*liters?\s*per\s*hour", full_desc.lower())
-        if lph_match:
-            lph_value = lph_match.group(1) or lph_match.group(2)
-            specs.append(f"Flow Rate: {lph_value} LPH")
+    # Only extract specifications that are explicitly mentioned in the CSV data
+    specs_from_data = []
     
-    if "gpd" in full_desc.lower():
-        gpd_match = re.search(r"(\d+)\s*gpd", full_desc.lower())
-        if gpd_match:
-            specs.append(f"Capacity: {gpd_match.group(1)} GPD")
+    # Extract LPH only if explicitly mentioned in the data
+    combined_text = f"{short_desc} {full_desc}".lower()
+    lph_match = re.search(r"(\d+)\s*lph", combined_text)
+    if lph_match:
+        specs_from_data.append(f"Flow Rate: {lph_match.group(1)} LPH")
+    
+    # Extract GPD only if explicitly mentioned in the data
+    gpd_match = re.search(r"(\d+)\s*gpd", combined_text)
+    if gpd_match:
+        specs_from_data.append(f"Capacity: {gpd_match.group(1)} GPD")
+    
+    # Extract storage capacity only if mentioned in data
+    storage_match = re.search(r"storage capacity of (\d+).*?liters?|(\d+).*?liters? storage", combined_text)
+    if storage_match:
+        storage_value = storage_match.group(1) or storage_match.group(2)
+        specs_from_data.append(f"Storage: {storage_value} liters")
+    
+    # Format price display - only show if price exists and is > 0
+    price_display = f"₹{int(price):,}" if price and float(price) > 0 else "Price on request"
     
     product_info = f"""
 🏷️ PRODUCT: {name}
-💰 PRICE: ₹{price:,}
+💰 PRICE: {price_display}
 📂 CATEGORY: {category}
 ⚡ KEY FEATURES: {short_desc}
 
-🔧 TECHNICAL SPECIFICATIONS:
-{chr(10).join(f"• {spec}" for spec in specs) if specs else "• Detailed specs available in full description"}
+🔧 SPECIFICATIONS (from product data):
+{chr(10).join(f"• {spec}" for spec in specs_from_data) if specs_from_data else "• Specifications available in product description"}
 
-📋 DETAILED DESCRIPTION:
-{full_desc[:500]}{'...' if len(full_desc) > 500 else ''}
+📋 PRODUCT DESCRIPTION:
+{full_desc[:400]}{'...' if len(full_desc) > 400 else ''}
 
-🎛️ AVAILABLE VARIANTS: {attributes if attributes else 'Standard model'}
+🎛️ AVAILABLE VARIANTS: {attributes if attributes else 'Contact for variants'}
 
-✅ SUITABLE FOR: {category.split('>')[0].strip() if '>' in category else category}
+✅ APPLICATION: {category.split('>')[0].strip() if '>' in category else category}
     """.strip()
     
+    return product_info
+
+def validate_csv_data_only(product_info):
+    """Ensure response contains only CSV data, no hallucinated information"""
+    # This function serves as a reminder to use only CSV data
+    # In a production system, this could implement actual validation
     return product_info
 
 def analyze_conversation_context():

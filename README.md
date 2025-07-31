@@ -37,6 +37,13 @@ An intelligent chatbot for water treatment product recommendations using advance
 - **Smart Topic Detection**: Automatically provides relevant educational content
 - **FAQ Coverage**: Answers common water treatment questions
 
+### 6. **Natural Conversation Flow**
+- **Smart Greeting Detection**: Recognizes various greeting patterns (hi, hello, good morning, etc.)
+- **Friendly Welcome Responses**: Multiple engaging greeting responses without product pushing
+- **Proper Farewell Handling**: Polite goodbye responses when conversation ends
+- **Enhanced Welcome Message**: Informative startup message explaining capabilities
+- **Context-Aware Responses**: Tracks conversation flow and interaction history
+
 ## 📋 Features
 
 - **GUI Interface**: Clean, modern chat interface with dark theme
@@ -48,6 +55,8 @@ An intelligent chatbot for water treatment product recommendations using advance
 - **Water Education**: Comprehensive knowledge base about water science and health
 - **Educational Q&A**: Answers questions about alkaline water, TDS, pH levels, water hardness
 - **Smart Content Delivery**: Combines product recommendations with educational information
+- **Natural Conversation**: Proper greeting handling and conversation flow management
+- **Welcome Experience**: Informative startup message explaining all capabilities
 
 ## 🛠️ Setup Instructions
 
@@ -118,6 +127,18 @@ Alkaline water is created through ionization process that increases pH and adds 
 💡 OUR SOLUTIONS:
 • RO+Alkaline systems that provide alkaline water
 • Alkaline + Mineral cartridges for existing systems"
+
+User: "Hi there!"
+Bot: "👋 Hello there! Great to meet you!
+
+I'm your Water Treatment Expert, and I'm here to help you with:
+
+🔹 **Product Recommendations**: Find the perfect RO, UV, or UF system
+🔹 **Water Education**: Learn about alkaline water, TDS, pH levels  
+🔹 **Technology Guidance**: Understand different purification methods
+🔹 **Health Benefits**: Discover how water quality affects your health
+
+What would you like to know about water treatment today? 😊"
 ```
 
 ## 🔧 Technical Architecture
@@ -145,6 +166,7 @@ Alkaline water is created through ionization process that increases pH and adds 
 5. ✅ **Enhanced User Experience**: Professional, informative responses
 6. ✅ **Water Education**: Comprehensive knowledge base about water science
 7. ✅ **Educational Q&A**: Answers water treatment and health questions
+8. ✅ **Natural Conversation Flow**: Proper greeting and farewell handling
 
 ## 🧪 Educational Topics Covered
 

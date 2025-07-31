@@ -346,6 +346,72 @@ def is_educational_query(user_input):
     query_lower = user_input.lower()
     return any(keyword in query_lower for keyword in educational_keywords)
 
+def is_greeting(user_input):
+    """Check if the user input is a greeting"""
+    greeting_keywords = [
+        "hi", "hello", "hey", "good morning", "good afternoon", "good evening",
+        "greetings", "howdy", "what's up", "whats up", "sup", "hiya", "hola"
+    ]
+    
+    query_lower = user_input.lower().strip()
+    
+    # Check for exact greetings or greetings with punctuation
+    if query_lower in greeting_keywords:
+        return True
+    
+    # Check for greetings with punctuation
+    clean_query = ''.join(char for char in query_lower if char.isalpha() or char.isspace()).strip()
+    if clean_query in greeting_keywords:
+        return True
+    
+    # Check if query starts with a greeting
+    for greeting in greeting_keywords:
+        if query_lower.startswith(greeting):
+            return True
+    
+    return False
+
+def get_greeting_response():
+    """Generate a friendly greeting response"""
+    import random
+    
+    responses = [
+        """👋 Hello there! Great to meet you!
+
+I'm your Water Treatment Expert, and I'm here to help you with:
+
+🔹 **Product Recommendations**: Find the perfect RO, UV, or UF system
+🔹 **Water Education**: Learn about alkaline water, TDS, pH levels
+🔹 **Technology Guidance**: Understand different purification methods
+🔹 **Health Benefits**: Discover how water quality affects your health
+
+What would you like to know about water treatment today? 😊""",
+
+        """👋 Hi! Welcome to your personal water treatment consultation!
+
+I'm excited to help you with:
+
+💧 **Smart Product Matching**: Get systems tailored to your needs
+🧪 **Water Science Made Simple**: Easy explanations of complex topics  
+⚡ **Technology Comparisons**: RO vs UV vs UF - what's best for you?
+🏠 **Custom Solutions**: For home, office, or industrial use
+
+How can I assist you with your water treatment needs? 🌟""",
+
+        """👋 Hello! I'm delighted you're here!
+
+As your Water Treatment Specialist, I can help with:
+
+🎯 **Perfect System Selection**: Find exactly what you need
+📚 **Educational Insights**: Learn about water quality and health
+🔧 **Technical Support**: Understand specifications and features
+💡 **Expert Advice**: Get professional recommendations
+
+What brings you here today? I'm ready to help! ✨"""
+    ]
+    
+    return random.choice(responses)
+
 prompt = ChatPromptTemplate.from_template("""
 You are a knowledgeable water treatment systems expert and educator. Help customers with both product recommendations and water education.
 
@@ -356,6 +422,8 @@ IMPORTANT RULES:
 4. Answer educational questions about water treatment, health benefits, and water science
 5. Focus on being informative and educational while remaining conversational
 6. If asked about water benefits, alkaline water, TDS, pH, etc., provide comprehensive information
+7. Do NOT handle greetings or goodbyes - they are handled separately
+8. Focus on technical and educational content only
 
 📝 Available Products:
 {info}
@@ -380,10 +448,10 @@ RESPONSE GUIDELINES:
 - Mention installation requirements, maintenance, and warranty if relevant for products
 - Compare products if multiple options are available
 - Only ask clarifying questions if absolutely necessary and not asked before
-- Avoid repetitive greetings or the same questions
-- If customer says goodbye, respond briefly and politely
+- Avoid repetitive content or the same questions
 - Balance product recommendations with educational information as appropriate
 - Use the educational content provided to give detailed explanations about water benefits
+- Be helpful, informative, and professional
 """)
 
 chain = prompt | model
@@ -393,7 +461,8 @@ user_context = {
     "shown_products": set(),
     "user_preferences": {},
     "current_filter": None,
-    "educational_topics_covered": set()
+    "educational_topics_covered": set(),
+    "has_greeted": False
 }
 
 def extract_keywords(user_input):
@@ -558,6 +627,34 @@ def handle_input(user_input):
     try:
         # Update conversation context
         user_context["asked_questions"].add(user_input.lower()[:50])
+        
+        # Handle greetings first - no product suggestions
+        if is_greeting(user_input):
+            greeting_response = get_greeting_response()
+            gui.display_reply(greeting_response)
+            
+            # Mark that greeting has occurred
+            user_context["has_greeted"] = True
+            
+            # Update conversation history
+            conversation_history.append(f"User: {user_input}")
+            conversation_history.append(f"Bot: [Greeting response]")
+            return
+        
+        # Check for goodbye/farewell
+        goodbye_keywords = ["bye", "goodbye", "see you", "farewell", "thanks", "thank you", "that's all", "thats all"]
+        if any(keyword in user_input.lower() for keyword in goodbye_keywords):
+            farewell_response = """👋 Thank you for using our Water Treatment Assistant! 
+
+I hope I was able to help you with your water treatment needs. If you have any more questions about products, water science, or anything else related to water treatment, feel free to ask anytime.
+
+Have a great day and stay hydrated! 💧✨"""
+            gui.display_reply(farewell_response)
+            
+            # Update conversation history
+            conversation_history.append(f"User: {user_input}")
+            conversation_history.append(f"Bot: [Farewell response]")
+            return
         
         # Check if this is an educational query
         is_educational = is_educational_query(user_input)

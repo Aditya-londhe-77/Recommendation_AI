@@ -31,183 +31,277 @@ vector_store = Chroma(
 retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 15})
 
 prompt = ChatPromptTemplate.from_template("""
-You are a friendly and knowledgeable sales assistant for a water treatment company.
-You help customers choose the right water purifier or system based on their needs.
-Be persuasive but honest. Explain things simply. Ask questions to understand needs.
+You are a knowledgeable water treatment systems sales assistant. Help customers find the right products.
 
-📝 Product List:
+IMPORTANT RULES:
+1. NEVER ask repetitive questions if the customer has already provided information
+2. If you have already shown products, don't ask the same questions again
+3. Provide detailed specifications and technical details for recommended products
+4. Focus on product benefits and features rather than asking more questions
+5. If the customer has asked about specific products, provide comprehensive information
+
+📝 Available Products:
 {info}
 
 🗣️ Customer Question:
 {question}
 
-💬 Conversation History:
+💬 Previous Conversation:
 {history}
 
-Instructions:
-- Only use information from the product list above.
-- Do not invent any product names or specs.
-- If the product is listed, give accurate and helpful details about it.
-- Do not hallucinate anything.
-- Do not suggest any products unless the customer explicitly asks.
-- If the user says "bye", "goodbye", or anything similar, reply politely and briefly.
+🎯 Context Analysis:
+{context_analysis}
+
+RESPONSE GUIDELINES:
+- If products are listed above, provide detailed information about them
+- Include technical specifications, features, capacity, price, and benefits
+- Mention installation requirements, maintenance, and warranty if relevant
+- Compare products if multiple options are available
+- Only ask clarifying questions if absolutely necessary and not asked before
+- Avoid repetitive greetings or the same questions
+- If customer says goodbye, respond briefly and politely
+- Focus on being helpful with detailed product information
 """)
 
 chain = prompt | model
 conversation_history = []
+user_context = {
+    "asked_questions": set(),
+    "shown_products": set(),
+    "user_preferences": {},
+    "current_filter": None
+}
 
 def extract_keywords(user_input):
+    """Enhanced keyword extraction with better water treatment terminology"""
     stopwords = {
         "do","you","have","has","is","the","a","an","i","we","are","with",
         "any","of","in","for","to","on","and","me","can","could","please",
         "would","like","need","want","tell","know","if","it","this","that",
-        "there","be","at","ave","products","what"
+        "there","be","at","ave","products","what","show","looking"
     }
     words = re.findall(r"\b\w{2,}\b", user_input.lower())
-    return [w for w in words if w not in stopwords]
+    keywords = [w for w in words if w not in stopwords]
+    
+    # Add price extraction
+    price_match = re.search(r"under\s*\₹?\s*(\d{2,6})|below\s*\₹?\s*(\d{2,6})|less\s*than\s*\₹?\s*(\d{2,6})", user_input.lower())
+    if price_match:
+        price_value = next(filter(None, price_match.groups()))
+        user_context["user_preferences"]["max_price"] = int(price_value)
+    
+    return keywords
 
 def normalize_keywords(keywords):
+    """Enhanced keyword normalization with comprehensive synonyms"""
     synonyms = {
-        "ros": ["ro"],
-        "atm": ["atm","vending","dispenser","coin"],
-        "softener": ["softener","softner"],
-        "machine": ["machine","unit","system"],
-        "plant": ["plant","system","unit"]
+        "ro": ["ro", "reverse", "osmosis"],
+        "uv": ["uv", "ultraviolet", "ultra", "violet"],
+        "uf": ["uf", "ultrafiltration", "ultra", "filtration"],
+        "atm": ["atm", "vending", "dispenser", "coin", "operated"],
+        "softener": ["softener", "softner", "soft", "water"],
+        "machine": ["machine", "unit", "system", "device"],
+        "plant": ["plant", "system", "unit", "treatment"],
+        "industrial": ["industrial", "commercial", "business"],
+        "domestic": ["domestic", "home", "household", "residential"],
+        "purifier": ["purifier", "filter", "filtration", "purification"],
+        "lph": ["lph", "liters", "per", "hour", "capacity"],
+        "gpd": ["gpd", "gallons", "per", "day"]
     }
+    
     normalized = set()
-    for w in keywords:
+    for word in keywords:
         matched = False
-        for group in synonyms.values():
-            if w in group:
-                normalized.update(group)
+        for key, group in synonyms.items():
+            if word in group:
+                normalized.add(key)
                 matched = True
                 break
         if not matched:
-            normalized.add(w)
+            normalized.add(word)
     return list(normalized)
 
-def matches_keywords(row, keywords):
-    text = " ".join([row.get("Name", ""), row.get("Short description", ""), row.get("Category", "")]).lower()
-    hits = sum(1 for k in keywords if k in text)
-    name_hits = sum(1 for k in keywords if k in row.get("Name","" ).lower())
-    min_hits = 1 if len(keywords) <= 1 else 2
-    return hits >= min_hits and name_hits >= 1
-
-def apply_filters(user_input):
-    price_match = re.search(r"under\s*\u20b9?\s*(\d{2,6})", user_input.lower())
-    max_price = int(price_match.group(1)) if price_match else None
-
-    raw = extract_keywords(user_input)
-    keywords = normalize_keywords(raw)
-
-    filtered = df.copy()
-
-    variant_kw = ["premium","classic","nx","advance","basic"]
-    if any(v in keywords for v in variant_kw):
-        pat = "|".join(v for v in variant_kw if v in keywords)
-        filtered = filtered[
-            filtered["Name"].str.contains(pat, case=False, na=False) |
-            filtered["Short description"].str.contains(pat, case=False, na=False)
+def enhanced_product_filtering(user_input):
+    """Improved product filtering with better matching logic"""
+    keywords = normalize_keywords(extract_keywords(user_input))
+    filtered_df = df.copy()
+    
+    # Apply price filter if specified
+    max_price = user_context["user_preferences"].get("max_price")
+    if max_price:
+        filtered_df = filtered_df[filtered_df["Regular_price"] <= max_price]
+    
+    # Category-based filtering
+    category_keywords = {
+        "industrial": ["industrial", "commercial"],
+        "domestic": ["domestic", "home"],
+        "atm": ["atm", "vending", "coin"],
+        "softener": ["softener"]
+    }
+    
+    for category, cat_keywords in category_keywords.items():
+        if any(kw in keywords for kw in cat_keywords):
+            category_filter = "|".join(cat_keywords)
+            filtered_df = filtered_df[
+                filtered_df["Category"].str.contains(category_filter, case=False, na=False) |
+                filtered_df["Name"].str.contains(category_filter, case=False, na=False)
+            ]
+    
+    # Technology-based filtering (RO, UV, UF)
+    tech_keywords = ["ro", "uv", "uf"]
+    tech_present = [kw for kw in tech_keywords if kw in keywords]
+    if tech_present:
+        tech_pattern = "|".join(tech_present)
+        filtered_df = filtered_df[
+            filtered_df["Name"].str.contains(tech_pattern, case=False, na=False) |
+            filtered_df["Short description"].str.contains(tech_pattern, case=False, na=False)
         ]
-
-    known_cats = ["industrial","commercial","domestic","softener","vending","atm","cooler","plant","machine"]
-    cats = [c for c in known_cats if c in keywords]
-    if cats:
-        pat = "|".join(cats)
-        filtered = filtered[filtered["Category"].str.contains(pat, case=False, na=False)]
-
-    if max_price is not None:
-        filtered = filtered[filtered["Regular_price"] <= max_price]
-
+    
+    # General keyword matching
     if keywords:
-        pat = "|".join(re.escape(k) for k in keywords)
-        filtered = filtered[
-            filtered["Name"].str.contains(pat, case=False, na=False) |
-            filtered["Short description"].str.contains(pat, case=False, na=False) |
-            filtered["Category"].str.contains(pat, case=False, na=False)
+        keyword_pattern = "|".join(re.escape(kw) for kw in keywords)
+        filtered_df = filtered_df[
+            filtered_df["Name"].str.contains(keyword_pattern, case=False, na=False) |
+            filtered_df["Short description"].str.contains(keyword_pattern, case=False, na=False) |
+            filtered_df["Category"].str.contains(keyword_pattern, case=False, na=False) |
+            filtered_df["Description"].str.contains(keyword_pattern, case=False, na=False)
         ]
+    
+    return filtered_df
 
-    if any(k in ["atm","vending"] for k in keywords) and filtered.empty:
-        atm_df = df[
-            df["Name"].str.contains("atm|vending|coin", case=False, na=False) |
-            df["Category"].str.contains("atm|vending|coin", case=False, na=False) |
-            df["Short description"].str.contains("atm|vending|coin", case=False, na=False)
-        ]
-        filtered = atm_df
+def create_detailed_product_info(row):
+    """Create comprehensive product information with all available details"""
+    name = row.get("Name", "")
+    price = row.get("Regular_price", 0)
+    category = row.get("Category", "")
+    short_desc = row.get("Short description", "")
+    full_desc = row.get("Description", "")
+    attributes = row.get("Attribute 1 value(s)", "")
+    
+    # Extract technical specifications from description
+    specs = []
+    if "lph" in full_desc.lower() or "liters per hour" in full_desc.lower():
+        lph_match = re.search(r"(\d+)\s*lph|\b(\d+)\s*liters?\s*per\s*hour", full_desc.lower())
+        if lph_match:
+            lph_value = lph_match.group(1) or lph_match.group(2)
+            specs.append(f"Flow Rate: {lph_value} LPH")
+    
+    if "gpd" in full_desc.lower():
+        gpd_match = re.search(r"(\d+)\s*gpd", full_desc.lower())
+        if gpd_match:
+            specs.append(f"Capacity: {gpd_match.group(1)} GPD")
+    
+    product_info = f"""
+🏷️ PRODUCT: {name}
+💰 PRICE: ₹{price:,}
+📂 CATEGORY: {category}
+⚡ KEY FEATURES: {short_desc}
 
-    return filtered
+🔧 TECHNICAL SPECIFICATIONS:
+{chr(10).join(f"• {spec}" for spec in specs) if specs else "• Detailed specs available in full description"}
+
+📋 DETAILED DESCRIPTION:
+{full_desc[:500]}{'...' if len(full_desc) > 500 else ''}
+
+🎛️ AVAILABLE VARIANTS: {attributes if attributes else 'Standard model'}
+
+✅ SUITABLE FOR: {category.split('>')[0].strip() if '>' in category else category}
+    """.strip()
+    
+    return product_info
+
+def analyze_conversation_context():
+    """Analyze conversation context to avoid repetitive questions"""
+    context = []
+    
+    if user_context["shown_products"]:
+        context.append(f"Already shown {len(user_context['shown_products'])} products")
+    
+    if user_context["user_preferences"]:
+        prefs = ", ".join(f"{k}: {v}" for k, v in user_context["user_preferences"].items())
+        context.append(f"User preferences: {prefs}")
+    
+    if user_context["asked_questions"]:
+        context.append(f"Previously asked about: {', '.join(list(user_context['asked_questions'])[:3])}")
+    
+    return " | ".join(context) if context else "Fresh conversation"
 
 def handle_input(user_input):
+    global conversation_history, user_context
+    
     try:
-        raw_kw = extract_keywords(user_input)
-        keywords = normalize_keywords(raw_kw)
-
-        docs = []
-        exact_df = df[df.apply(lambda r: matches_keywords(r, keywords), axis=1)]
-        for _, row in exact_df.iterrows():
-            docs.append(Document(page_content= (
-                f"Name: {row['Name']}\nPrice: ₹{row['Regular_price']}\nCategory: {row['Category']}\nDescription: {row['Short description']}"
-            )))
-
-        if not docs:
-            filtered_df = apply_filters(user_input)
-            for _, row in filtered_df.head(5).iterrows():
-                docs.append(Document(page_content=(
-                    f"Name: {row['Name']}\nPrice: ₹{row['Regular_price']}\nCategory: {row['Category']}\nDescription: {row['Short description']}"
-                )))
-
-        if not docs:
-            vector_docs = retriever.get_relevant_documents(user_input)
-            docs.extend(vector_docs)
-
-        if not docs:
-            gui.display_reply("❌ Sorry, no matching products were found.")
-            return
-
-        product_info = "\n\n".join(d.page_content for d in docs)
-        recent_hist = "\n".join(conversation_history[-4:])
-
-        payload = {
-            "history": recent_hist,
-            "question": user_input,
-            "info": product_info
-        }
-
-        response = chain.invoke(payload)
-        final = response.content.strip()
-
-        gui.display_reply(final)
-
-        #if single product matched shows image 
-        if len(docs) == 1:
-            product_name = docs[0].page_content.split("\n")[0].replace("Name: ", "").strip()
-            product_row = df[df["Name"].str.lower() == product_name.lower()]
-            if not product_row.empty:
-                image_url = product_row.iloc[0].get("Images", "")
-                if image_url.startswith("http"):
-                    gui.display_image(image_url)
-                    if len(docs) == 1:
-                     product_name = docs[0].page_content.split("\n")[0].replace("Name: ", "").strip()
-                     print(f"[DEBUG] Matched product name: {product_name}")
-                     product_row = df[df["Name"].str.lower() == product_name.lower()]
-                     if not product_row.empty:
-                         image_url = product_row.iloc[0].get("images", "")
-                         print(f"[DEBUG] Image URL: {image_url}")
-                         if image_url.startswith("http"):
-                            gui.display_image(image_url)
-                             
-                         else:
-                             print("[DEBUG] No valid image URL found.")
-                     else:
-                         print("[DEBUG] No matching product row found.")
-
+        # Update conversation context
+        user_context["asked_questions"].add(user_input.lower()[:50])  # Track question patterns
         
-
+        # Enhanced product filtering
+        filtered_df = enhanced_product_filtering(user_input)
+        
+        # Get top relevant products (limit to avoid overwhelming)
+        top_products = filtered_df.head(8) if not filtered_df.empty else df.head(5)
+        
+        # Create detailed product documents
+        docs = []
+        for _, row in top_products.iterrows():
+            product_name = row.get("Name", "")
+            user_context["shown_products"].add(product_name)
+            
+            detailed_info = create_detailed_product_info(row)
+            docs.append(Document(page_content=detailed_info))
+        
+        # Fallback to vector search if no direct matches
+        if filtered_df.empty:
+            vector_docs = retriever.get_relevant_documents(user_input)
+            docs.extend(vector_docs[:3])  # Limit vector results
+        
+        if not docs:
+            gui.display_reply("❌ Sorry, I couldn't find any matching water treatment products. Could you try describing what type of system you need?")
+            return
+        
+        # Prepare context for LLM
+        product_info = "\n\n".join(d.page_content for d in docs[:5])  # Limit to top 5 products
+        recent_history = "\n".join(conversation_history[-6:])  # Last 3 exchanges
+        context_analysis = analyze_conversation_context()
+        
+        payload = {
+            "history": recent_history,
+            "question": user_input,
+            "info": product_info,
+            "context_analysis": context_analysis
+        }
+        
+        response = chain.invoke(payload)
+        final_response = response.content.strip()
+        
+        # Display response
+        gui.display_reply(final_response)
+        
+        # Handle image display for single product matches
+        if len(docs) == 1 and hasattr(docs[0], 'page_content'):
+            try:
+                # Extract product name from detailed info
+                product_name_match = re.search(r"🏷️ PRODUCT: (.+)", docs[0].page_content)
+                if product_name_match:
+                    product_name = product_name_match.group(1).strip()
+                    product_row = df[df["Name"].str.lower() == product_name.lower()]
+                    if not product_row.empty:
+                        image_url = product_row.iloc[0].get("Images", "")
+                        if image_url and image_url.startswith("http"):
+                            # Take first image if multiple URLs
+                            first_image = image_url.split(",")[0].strip()
+                            gui.display_image(first_image)
+            except Exception as img_error:
+                print(f"[DEBUG] Image display error: {img_error}")
+        
+        # Update conversation history
         conversation_history.append(f"User: {user_input}")
-        conversation_history.append(f"Bot: {final}")
-
+        conversation_history.append(f"Bot: {final_response[:200]}...")  # Truncate for memory
+        
+        # Keep conversation history manageable
+        if len(conversation_history) > 12:
+            conversation_history = conversation_history[-12:]
+    
     except Exception as e:
-       gui.display_reply(f"❌ Error occurred: {str(e)}")
+        gui.display_reply(f"❌ Error occurred: {str(e)}")
+        print(f"[DEBUG] Error in handle_input: {e}")
 
 gui = ChatGUI(on_submit=handle_input)
 gui.run()
